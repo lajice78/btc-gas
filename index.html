@@ -345,7 +345,6 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   function noter(r) {
     var s = st.cours; if (!s || etat(s).fini) return;
-    flash(r, s.disc);
     s.tirs.push(r);
     if (etat(s).fini) terminer(); else { saveLocal(); render(); }
   }
