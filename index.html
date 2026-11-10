@@ -245,7 +245,6 @@ input[type=password],input[type=tel],input[type=email]{font:inherit;color:var(--
 .mur{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
 #app.large{max-width:1500px}
 @media print{html,body{background:#fff!important;color:#000!important}body::before,body::after{display:none!important}#app{max-width:none;padding:0}button,.syn,.pill,header .ghost{display:none!important}.card{background:#fff!important;border:1px solid #999!important;box-shadow:none!important;color:#000!important;break-inside:avoid;backdrop-filter:none!important}.muted,.small{color:#333!important}*{color:#000!important;text-shadow:none!important}.rank.first{background:#f2f2f2!important}}
-.fus{display:block;box-sizing:border-box;margin:-6px 0 2px 44px;width:calc(100% - 44px);max-width:calc(100% - 44px);align-self:flex-start;font-size:14px;padding:8px 12px;opacity:.85}
 .barres{display:flex;align-items:flex-end;gap:5px;height:90px}
 .barres i{flex:1;min-width:8px;border-radius:5px 5px 0 0;background:linear-gradient(180deg,var(--accent2),var(--accent));position:relative}
 .barres i span{white-space:nowrap;position:absolute;left:50%;top:-17px;transform:translateX(-50%);font-size:11px;font-style:normal;color:var(--muted)}
@@ -479,7 +478,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function concEnvoi(id, doc, apres) { fetch(FB + 'concours/' + encodeURIComponent(id), { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc(doc).mapValue.fields }) }).then(function (r) { if (!r.ok) throw 0; st.conc[id] = concLocal(doc); lset('btc.conc', st.conc); st.msg = ''; if (apres) apres(); render(); }).catch(function () { st.msg = 'Enregistrement impossible : reconnectez-vous à l\'espace administrateur ou vérifiez le réseau.'; render(); }); }
   function vMembre() {
     var h = entete('Espace membre', 'accueil');
-    if (st.membre) return h + '<div class="card"><h2>' + esc(st.membre.nom) + '</h2><p class="muted">Vous êtes connecté sur ce téléphone.</p><button class="primary" data-act="tireur" data-k="' + st.membre.k + '">Mes statistiques</button><button class="ghost" data-act="membreout">Me déconnecter</button></div>';
+    if (st.membre) return h + '<div class="card"><h2>' + esc(st.membre.nom) + '</h2><p class="muted">Vous êtes connecté sur ce téléphone.</p><p class="small muted" style="margin-bottom:4px">Marque de mon fusil (facultatif)</p><input type="text" id="mfusil" list="dl-fus" autocomplete="off" maxlength="30" placeholder="Par exemple Beretta" value="' + esc(st.membre.fusil || '') + '"><datalist id="dl-fus">' + fusilsConnus().map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist><p class="small muted">Elle sert à comparer vos moyennes par fusil dans vos statistiques, pour les planches notées depuis ce téléphone.</p><button class="primary" data-act="tireur" data-k="' + st.membre.k + '">Mes statistiques</button><button class="ghost" data-act="membreout">Me déconnecter</button></div>';
     var noms = licNoms();
     return h + '<div class="card"><h2>Connexion</h2><p class="muted">' + (st.apres ? 'Il faut être connecté pour noter une planche. ' : '') + 'Saisissez le code du club, puis choisissez votre nom.</p><input type="password" id="mcode" autocomplete="off" placeholder="Code du club"><input type="text" id="mnom" list="dl-mb" autocomplete="off" placeholder="Votre nom"><datalist id="dl-mb">' + noms.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist><button class="primary" data-act="membrein">Me connecter</button>' + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '') + '</div>';
   }
@@ -591,17 +590,17 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
 
   /* ---- actions ---- */
   function ajouterLic(nom) { nom = nom.trim().replace(/\s+/g, ' '); if (!nom) return; var id = slug(nom); if (st.lic[id]) return; st.lic[id] = { nom: nom }; saveLocal(); pousser('licencies', id, { nom: nom }); }
-  function nouvellePlanche(disc, noms, pas) { var n = MAXT[disc], a = []; for (var i = 0; i < n; i++) a.push((noms && noms[i]) || ''); st.planche = { disc: disc, noms: a, fusils: [], fman: {}, memo: {}, pas: pas || '' }; st.msg = ''; st.ecran = 'planche'; }
+  function nouvellePlanche(disc, noms, pas) { var n = MAXT[disc], a = []; for (var i = 0; i < n; i++) a.push((noms && noms[i]) || ''); st.planche = { disc: disc, noms: a, memo: {}, pas: pas || '' }; st.msg = ''; st.ecran = 'planche'; }
   var FUSILS = ['Beretta', 'Browning', 'Perazzi', 'Krieghoff', 'Blaser', 'Caesar Guerini', 'Miroku', 'Winchester', 'Benelli', 'Fabarm', 'Zoli', 'Rizzini', 'Verney-Carron', 'Yildiz'];
   function fusilDe(k) { var f = '', d = 0; if (!k) return f; Object.keys(st.ses).forEach(function (id) { var s = st.ses[id]; if (s.date < d) return; s.tireurs.forEach(function (t) { if (t.fusil && slug(t.nom) === k) { f = t.fusil; d = s.date; } }); }); return f; }
   function fusilsConnus() { var o = {}; FUSILS.forEach(function (f) { o[f.toLowerCase()] = f; }); Object.keys(st.ses).forEach(function (id) { st.ses[id].tireurs.forEach(function (t) { if (t.fusil) o[t.fusil.toLowerCase()] = t.fusil; }); }); return Object.keys(o).sort().map(function (k) { return o[k]; }); }
   function demarrer(attente) {
-    var p = st.planche, tireurs = [], vus = {}; p.fusils = p.fusils || [];
+    var p = st.planche, tireurs = [], vus = {};
     for (var i = 0; i < p.noms.length; i++) {
       var nom = p.noms[i].trim().replace(/\s+/g, ' '); if (!nom) continue;
       var id = slug(nom); if (vus[id]) { st.msg = '« ' + nom + ' » est inscrit deux fois.'; return render(); } vus[id] = 1;
       var connu = !!st.lic[id];
-      var tr = { nom: connu ? st.lic[id].nom : nom, statut: connu ? 'licencie' : 'invite' }, fu = (p.fusils[i] || '').trim().replace(/\s+/g, ' ').slice(0, 30); if (fu) tr.fusil = fu; tireurs.push(tr);
+      var tr = { nom: connu ? st.lic[id].nom : nom, statut: connu ? 'licencie' : 'invite' }, fu = st.membre && st.membre.k === id ? (st.membre.fusil || '') : ''; if (fu) tr.fusil = fu; tireurs.push(tr);
     }
     if (!tireurs.length) { st.msg = 'Inscrivez au moins un tireur.'; return render(); }
     var nv = { id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), disc: p.disc, pas: p.pas || '', date: Date.now(), tireurs: tireurs, tirs: [], ack: 0 };
@@ -721,12 +720,12 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     return h;
   }
   function vPlanche() {
-    var p = st.planche, noms = licNoms(), pris = {}; p.fusils = p.fusils || []; p.fman = p.fman || {}; p.noms.forEach(function (n, i) { if (n.trim()) pris[slug(n)] = 1; if (!p.fman[i]) p.fusils[i] = n.trim() ? fusilDe(slug(n)) : ''; });
+    var p = st.planche, noms = licNoms(), pris = {}; p.noms.forEach(function (n) { if (n.trim()) pris[slug(n)] = 1; });
     var h = entete('Planche ' + p.disc, 'accueil') + '<p class="muted">Inscrivez les tireurs dans l\'ordre de passage. ' + (p.disc === 'DTL' ? 'Le tireur 1 commence au poste 1, le tireur 2 au poste 2, etc.' : 'Le tireur 6 attend derrière le poste 1.') + ' Un nom absent de la liste du club est noté comme invité.</p><div class="stack">';
     p.noms.forEach(function (n, i) {
-      h += '<div class="slot"><span class="n">' + (i + 1) + '</span><input type="text" id="t' + i + '" data-slot="' + i + '" list="dl-lic" autocomplete="off" enterkeyhint="' + (i + 1 < p.noms.length ? 'next' : 'done') + '" placeholder="Nom du tireur ' + (i + 1) + '" value="' + esc(n) + '"></div><input type="text" class="fus" id="f' + i + '" data-fusil="' + i + '" list="dl-fus" autocomplete="off" maxlength="30" placeholder="Marque du fusil (facultatif)" value="' + esc(p.fusils[i] || '') + '">';
+      h += '<div class="slot"><span class="n">' + (i + 1) + '</span><input type="text" id="t' + i + '" data-slot="' + i + '" list="dl-lic" autocomplete="off" enterkeyhint="' + (i + 1 < p.noms.length ? 'next' : 'done') + '" placeholder="Nom du tireur ' + (i + 1) + '" value="' + esc(n) + '"></div>';
     });
-    h += '</div><datalist id="dl-lic">' + noms.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist><datalist id="dl-fus">' + fusilsConnus().map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>';
+    h += '</div><datalist id="dl-lic">' + noms.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>';
     var dispo = noms.filter(function (n) { return !pris[slug(n)]; });
     if (dispo.length && dispo.length <= 40) h += '<div class="stack"><p class="small muted">Licenciés : touchez un nom pour l\'inscrire à la prochaine place libre.</p><div class="chips">' + dispo.map(function (n) { return '<button data-act="chip" data-n="' + esc(n) + '">' + esc(n) + '</button>'; }).join('') + '</div></div>';
     if (st.msg) h += '<p class="err">' + esc(st.msg) + '</p>';
@@ -759,7 +758,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     var s = st.ses[st.vue]; if (!s) return vAccueil();
     var c = classement(s), d = s.disc === 'DTL', mx = maxPts(s.disc);
     var h = entete('Résultat ' + s.disc, st.retour || 'accueil') + '<p class="muted">' + fdate(s.date) + (s.num ? ' · ' + numTxt(s) : '') + (s.meteo ? '<br>' + meteoFeuille(s) : '') + '</p><div class="syn"><span class="cap"></span></div><div class="card"><h2>Classement</h2>';
-    c.forEach(function (x) { h += '<div class="rank' + (x.rang === 1 ? ' first' : '') + '"><span class="rg">' + x.rang + '</span><span><b>' + esc(x.nom) + '</b><br><span class="small muted">' + (d ? x.casses + '/25 cassés, ' : '') + x.premier + ' au 1er coup' + (s.tireurs[x.i].statut === 'invite' ? ' · invité' : '') + (s.tireurs[x.i].fusil ? ' · ' + esc(s.tireurs[x.i].fusil) : '') + (x.exaequo ? ' · ex æquo, barrage' : '') + '</span></span><span class="sc">' + x.total + '<small>/' + mx + '</small></span></div>'; });
+    c.forEach(function (x) { h += '<div class="rank' + (x.rang === 1 ? ' first' : '') + '"><span class="rg">' + x.rang + '</span><span><b>' + esc(x.nom) + '</b><br><span class="small muted">' + (d ? x.casses + '/25 cassés, ' : '') + x.premier + ' au 1er coup' + (s.tireurs[x.i].statut === 'invite' ? ' · invité' : '') + (x.exaequo ? ' · ex æquo, barrage' : '') + '</span></span><span class="sc">' + x.total + '<small>/' + mx + '</small></span></div>'; });
     h += '</div><div class="row" style="justify-content:space-between"><h2>Grille de marque</h2>' + (st.clubOk ? '<button class="ghost" data-act="edit">' + (st.edit ? 'Terminer la correction' : 'Corriger un tir') + '</button>' : '') + '</div>';
     if (!st.clubOk) st.edit = false;
     if (st.edit) h += '<p class="small muted">Touchez une case pour changer sa valeur : 1er coup, 2e coup, zéro.</p>';
@@ -1278,8 +1277,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   /* ---- évènements ---- */
   app.addEventListener('input', function (ev) {
     var t = ev.target;
-    if (t.dataset.fusil !== undefined) { var pf = st.planche, jf = +t.dataset.fusil; pf.fusils = pf.fusils || []; pf.fman = pf.fman || {}; pf.fusils[jf] = t.value; pf.fman[jf] = 1; return; }
-    if (t.dataset.slot !== undefined) { var i = +t.dataset.slot; st.planche.noms[i] = t.value; var pq = st.planche; pq.fusils = pq.fusils || []; pq.fman = pq.fman || {}; if (!pq.fman[i]) { pq.fusils[i] = t.value.trim() ? fusilDe(slug(t.value)) : ''; var fe = document.getElementById('f' + i); if (fe) fe.value = pq.fusils[i]; } var m = document.getElementById('memo' + i); if (m) m.hidden = !(t.value.trim() && !st.lic[slug(t.value)]); }
+    if (t.id === 'mfusil' && st.membre) { st.membre.fusil = t.value.trim().replace(/\s+/g, ' ').slice(0, 30); lset('btc.membre', st.membre); return; }
+    if (t.dataset.slot !== undefined) { var i = +t.dataset.slot; st.planche.noms[i] = t.value; var m = document.getElementById('memo' + i); if (m) m.hidden = !(t.value.trim() && !st.lic[slug(t.value)]); }
     if (t.dataset.memo !== undefined) st.planche.memo[+t.dataset.memo] = t.checked;
   });
   app.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && ev.target.dataset && ev.target.dataset.slot !== undefined) { ev.preventDefault(); var nx = document.getElementById('t' + (+ev.target.dataset.slot + 1)); if (nx) { nx.focus(); nx.select(); } else { ev.target.blur(); var bd = app.querySelector('[data-act=demarrer]'); if (bd) bd.scrollIntoView({ block: 'center' }); } return; }
