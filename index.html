@@ -247,6 +247,13 @@ input[type=password],input[type=tel],input[type=email]{font:inherit;color:var(--
 @media print{html,body{background:#fff!important;color:#000!important}body::before,body::after{display:none!important}#app{max-width:none;padding:0}button,.syn,.pill,header .ghost{display:none!important}.card{background:#fff!important;border:1px solid #999!important;box-shadow:none!important;color:#000!important;break-inside:avoid;backdrop-filter:none!important}.muted,.small{color:#333!important}*{color:#000!important;text-shadow:none!important}.rank.first{background:#f2f2f2!important}}
 .secu{margin:0;padding-left:20px}.secu li{margin:7px 0;line-height:1.4}
 .stack.pl{gap:6px}
+.tirv{display:flex;flex-direction:column;gap:10px;margin-top:-8px}
+.tirv .syn{height:clamp(130px,calc(100dvh - 500px),280px)}
+.tirv .now{padding:14px 18px;border-radius:24px}
+.tirv .now .nom{font-size:clamp(26px,8.2vw,40px);margin:3px 0}
+.tirv .shots{gap:8px}
+.tirv .shots button{min-height:58px;border-radius:20px}
+.tirv .link{min-height:32px;padding:2px 4px}
 .liens{display:flex;justify-content:center;align-items:center;gap:4px;flex-wrap:wrap;margin-top:-8px}
 .hero{height:calc(100dvh - 112px)!important;min-height:330px!important;max-height:none}
 .barres{display:flex;align-items:flex-end;gap:5px;height:90px}
@@ -743,7 +750,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (e.rotation) return vRotation(s, e);
     var b = bilan(s), N = e.N, suiv = (e.n + 1 < e.total) ? { i: (e.n + 1) % N, k: Math.floor((e.n + 1) / N) } : null;
     var d = s.disc === 'DTL';
-    var h = entete(s.disc + ' ' + (e.k + 1) + '/25', 'accueil') + (s.num ? '<p class="small muted" style="margin:-8px 0 0">' + numTxt(s) + '</p>' : '') + '<div class="prog"><i style="width:' + Math.round(100 * e.n / e.total) + '%"></i></div>';
+    var h = entete(s.disc + ' ' + (e.k + 1) + '/25', 'accueil') + (s.num ? '<p class="small muted" style="margin:-8px 0 0">' + numTxt(s) + '</p>' : '') + '<div class="tirv"><div class="prog"><i style="width:' + Math.round(100 * e.n / e.total) + '%"></i></div>';
     var occ = {}; for (var q = 0; q < N; q++) { var ii = (e.i + q) % N, kk = (!d && ii < e.i) ? e.k + 1 : e.k; if (kk < NB) { var pp = posteDe(s.disc, ii, kk); if (!occ[pp]) occ[pp] = ii + 1; } }
     h += '<div class="syn"><span class="cap"></span></div>';
     h += '<div class="postes">' + [1, 2, 3, 4, 5].map(function (pn) { return '<div class="po' + (pn === e.poste ? ' act' : '') + (occ[pn] ? '' : ' vide') + '"><b>' + (occ[pn] || '') + '</b><span>P' + pn + '</span></div>'; }).join('') + '</div>';
@@ -753,7 +760,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     h += '<div class="card"><div class="board">';
     var g0 = Math.floor(e.k / 5) * 5;
     b.forEach(function (x, i) { h += '<div class="l' + (i === e.i ? ' cur' : '') + '"><span>' + (i + 1) + '</span><span class="nm">' + esc(x.nom) + '</span><span class="marks">' + marks(s.disc, x.marks.slice(g0, g0 + 5)) + '</span><span class="tot">' + x.total + '</span></div>'; });
-    return h + '</div><p class="small muted">Plateaux ' + (g0 + 1) + ' à ' + (g0 + 5) + ' et total en cours.</p></div>';
+    return h + '</div><p class="small muted">Plateaux ' + (g0 + 1) + ' à ' + (g0 + 5) + ' et total en cours.</p></div></div>';
   }
   function vResultat() {
     var s = st.ses[st.vue]; if (!s) return vAccueil();
