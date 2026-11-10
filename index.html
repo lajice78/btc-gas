@@ -332,13 +332,13 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   /* ---- stockage local (confort, peut manquer) ---- */
   function lget(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
   function lset(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-  st.lic = lget('btc.lic', {}); st.ses = lget('btc.ses', {}); st.cours = lget('btc.cours', null);
+  st.lic = lget('btc.lic', {}); st.ses = lget('btc.ses', {}); st.cours = lget('btc.cours', null); st.pauses = lget('btc.pauses', {});
   st.skin = lget('btc.skin2', 'sombre');
   function peau() { document.documentElement.classList.toggle('clair', st.skin !== 'sombre'); }
   peau();
   Object.keys(st.ses).forEach(function (id) { if (!(st.ses[id].date >= PURGE)) delete st.ses[id]; });
   if (st.cours && !(st.cours.date >= PURGE)) st.cours = null;
-  function saveLocal() { lset('btc.lic', st.lic); lset('btc.ses', st.ses); lset('btc.cours', st.cours); }
+  function saveLocal() { lset('btc.lic', st.lic); lset('btc.ses', st.ses); lset('btc.cours', st.cours); lset('btc.pauses', st.pauses || {}); }
 
   function slug(n) { return n.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'x'; }
   function esc(x) { return String(x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -393,7 +393,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   var dirT = null, DIRECT_ON = true;
   function vivre() { var s = st.cours; if (!HORS || !DIRECT_ON || !s) return; fetch(FB + 'direct/' + encodeURIComponent(s.id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: fbEnc({ disc: s.disc, pas: s.pas || '', date: s.date, maj: Date.now(), tireurs: s.tireurs, tirs: s.tirs }).mapValue.fields }) }).catch(function () {}); }
   function mort(id) { if (!HORS || !DIRECT_ON || !id) return; fetch(FB + 'direct/' + encodeURIComponent(id), { method: 'DELETE' }).catch(function () {}); }
-  function fbDirect() { if (!HORS) return; fbListe('direct', '', {}).then(function (d) { st.direct = d; if (st.ecran === 'direct') render(); }).catch(function () {}); }
+  function fbDirect() { if (!HORS || !DIRECT_ON) return; fbListe('direct', '', {}).then(function (d) { var av = Object.keys(st.direct || {}).join(); st.direct = d; if (st.ecran === 'direct' || (st.ecran === 'accueil' && av !== Object.keys(d).join())) render(); }).catch(function () {}); }
   function dirGo() { if (!HORS || dirT) return; fbDirect(); dirT = setInterval(function () { if (st.ecran !== 'direct') { clearInterval(dirT); dirT = null; return; } if (!document.hidden) { if (++st.dtic % 2 === 0) st.dper = (st.dper + 1) % 4; fbDirect(); fbSync(false); } }, 6000); }
   function pousser(col, id, body) { if (HORS) { fbSet(col, col === 'sessions' ? 'ses' : 'lic', id); return; } if (!db) return; db.collection(col).doc(id).set(body).catch(function () {}); }
   function retirer(col, id) { if (HORS) { fetch(FB + col + '/' + encodeURIComponent(id), { method: 'DELETE', headers: fbTete() }).catch(function () {}); if (col === 'licencies') fetch(FB + 'fiches/' + encodeURIComponent(id), { method: 'DELETE', headers: fbTete() }).catch(function () {}); return; } if (!db) return; db.collection(col).doc(id).delete().catch(function () {}); }
@@ -412,7 +412,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function corpsSes(s) { return { disc: s.disc, date: s.date, tireurs: s.tireurs, tirs: s.tirs, termine: true }; }
   function brancher() {
     if (HORS) {
-      sync = 'attente'; render(); fbSync(true);
+      sync = 'attente'; render(); fbSync(true); fbDirect();
       document.addEventListener('visibilitychange', function () { if (!document.hidden) fbSync(false); });
       try { var ml = document.createElement('link'); ml.rel = 'manifest'; ml.href = 'manifest.webmanifest'; document.head.appendChild(ml);
         var ic = document.createElement('link'); ic.rel = 'apple-touch-icon'; ic.href = 'icon-192.png'; document.head.appendChild(ic);
@@ -442,6 +442,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       tireurs.push({ nom: connu ? st.lic[id].nom : nom, statut: connu ? 'licencie' : 'invite' });
     }
     if (!tireurs.length) { st.msg = 'Inscrivez au moins un tireur.'; return render(); }
+    if (st.cours) st.pauses[st.cours.id] = st.cours; // la planche déjà commencée est mise de côté, pas perdue
     st.cours = { id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), disc: p.disc, pas: p.pas || '', date: Date.now(), tireurs: tireurs, tirs: [], ack: 0 };
     saveLocal(); vivre(); st.ecran = 'tir'; render();
   }
@@ -544,7 +545,11 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       '<g transform="translate(318 64) rotate(-16)"><g class="' + (heroAnim ? 'vol' : '') + '"><ellipse cx="0" cy="7" rx="44" ry="13" fill="#9c3306"/><ellipse cx="0" cy="0" rx="44" ry="13" fill="#ff6a1f"/><ellipse cx="0" cy="-3" rx="27" ry="7.5" fill="#ff8a4a"/><ellipse cx="0" cy="-5" rx="12" ry="3.2" fill="#ffc09a"/></g></g>' +
       '<g class="' + (heroAnim ? 'eclat' : '') + '" fill="#ffa24a"><path d="M262 120l13-5-3 12z"/><path d="M284 142l9 2-6 7z" opacity=".8"/><path d="M246 144l6-8 5 9z" opacity=".6"/></g>' +
       '</svg>' + p + '<button class="pin" data-pin="0" data-act="nouv" data-d="DTL" data-p="A">DTL<small>pas A</small></button><button class="pin bas" data-pin="1" data-act="nouv" data-d="FU" data-p="B">FU<small>fosse B</small></button><button class="pin" data-pin="2" data-act="nouv" data-d="DTL" data-p="C">DTL<small>pas C</small></button><button class="pin bas clair" data-pin="3" data-act="aller" data-e="' + (HORS && DIRECT_ON ? 'direct' : 'general') + '">Scores<small>club-house</small></button><span class="wm">BTC<em>GAS</em></span><span class="sub">Feuille de marque DTL · FU</span></div>'; heroAnim = false;
-    if (st.cours) { var e = etat(st.cours); h += '<div class="card"><h2>Planche en cours</h2><p>' + st.cours.disc + ', ' + st.cours.tireurs.length + ' tireur(s), ' + e.n + ' tirs notés sur ' + e.total + '.</p><div class="row"><button class="primary" data-act="aller" data-e="tir">Reprendre</button><button data-act="abandon">Abandonner</button></div></div>'; }
+    var PC = []; if (st.cours) PC.push([st.cours, 'ici']); Object.keys(st.pauses).forEach(function (id) { PC.push([st.pauses[id], 'pause']); });
+    if (HORS) Object.keys(st.direct || {}).forEach(function (id) { var d = st.direct[id]; if (!d || !d.tireurs || !d.tirs || (st.cours && st.cours.id === id) || st.pauses[id] || st.ses[id] || !(d.maj > Date.now() - 12 * 3600000) || d.tirs.length >= d.tireurs.length * NB) return; PC.push([Object.assign({ id: id }, d), 'autre']); });
+    if (PC.length) { PC.sort(function (p, q) { return q[0].date - p[0].date; }); h += '<div class="card"><h2>Planche' + (PC.length > 1 ? 's' : '') + ' en cours</h2>';
+      PC.forEach(function (x) { var c = x[0], e = etat(c); h += '<div class="item col"><span><b>' + c.disc + (c.pas ? ' · ' + (c.disc === 'FU' ? 'fosse ' : 'pas ') + c.pas : '') + '</b> · ' + fdate(c.date).slice(11) + (x[1] === 'autre' ? ' · <span class="muted">lancée sur un autre téléphone</span>' : '') + '<br><span class="small muted">' + esc(c.tireurs.map(function (t) { return nomCourt(t.nom); }).join(', ')) + ' · ' + e.n + ' tirs sur ' + e.total + '</span></span><span class="row"><button class="primary" data-act="reprendre" data-id="' + c.id + '">Reprendre</button><button data-act="abandon" data-id="' + c.id + '">Abandonner</button></span></div>'; });
+      h += '</div>'; }
     h += '<div class="stack"><div class="disc">' +
       '<button data-act="nouv" data-d="DTL"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M60 14L22 2"/><path d="M60 14V0"/><path d="M60 14L98 2"/></g><rect x="52" y="12" width="16" height="7" rx="2" fill="#ff6a1f"/><g fill="currentColor"><circle cx="16" cy="40" r="5"/><circle cx="38" cy="47" r="5"/><circle cx="60" cy="50" r="5"/><circle cx="82" cy="47" r="5"/><circle cx="104" cy="40" r="5"/></g></svg><b>DTL</b><span>5 tireurs, 5 plateaux par poste<br>3 pts / 2 pts / 0</span></button>' +
       '<button data-act="nouv" data-d="FU"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M16 14L4 0"/><path d="M38 14L46 0"/><path d="M60 14V0"/><path d="M82 14L72 0"/><path d="M104 14L116 0"/></g><g fill="#ff6a1f"><rect x="10" y="12" width="12" height="7" rx="2"/><rect x="32" y="12" width="12" height="7" rx="2"/><rect x="54" y="12" width="12" height="7" rx="2"/><rect x="76" y="12" width="12" height="7" rx="2"/><rect x="98" y="12" width="12" height="7" rx="2"/></g><g fill="currentColor"><circle cx="16" cy="48" r="5"/><circle cx="38" cy="48" r="5"/><circle cx="60" cy="48" r="5"/><circle cx="82" cy="48" r="5"/><circle cx="104" cy="48" r="5"/></g></svg><b>FU</b><span>Fosse universelle, 6 tireurs<br>1 pt par plateau cassé</span></button></div></div>';
@@ -1024,7 +1029,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     var b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
     var a = b.dataset.act, s;
     if (a !== 'suppr' && a !== 'dellic' && a !== 'fdel' && a !== 'sesdel' && a !== 'seldel') st.suppr = null;
-    if (a === 'aller') { if (b.dataset.e === 'direct') dirGo(); if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; }
+    if (a === 'aller') { if (b.dataset.e === 'direct') dirGo(); if (b.dataset.e === 'accueil') fbDirect(); if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; }
     else if (a === 'clublock') { jeton = null; st.clubOk = false; st.edit = false; st.ecran = 'accueil'; }
     else if (a === 'sesdel') { st.suppr = st.vue; }
     else if (a === 'sel') { if (st.sel[b.dataset.id]) delete st.sel[b.dataset.id]; else st.sel[b.dataset.id] = 1; }
@@ -1056,7 +1061,9 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'noter') return noter(+b.dataset.r);
     else if (a === 'annuler') { s = st.cours; if (s && s.tirs.length) { if (SY) SY.stop(); s.tirs.pop(); s.ack = 0; if (etat(s).rotation) s.ack = s.tirs.length; saveLocal(); vivre(); } }
     else if (a === 'pret') { st.cours.ack = st.cours.tirs.length; saveLocal(); }
-    else if (a === 'abandon') { if (st.cours) mort(st.cours.id); st.cours = null; saveLocal(); }
+    else if (a === 'abandon') { var ai = b.dataset.id || (st.cours && st.cours.id); if (ai) { mort(ai); if (st.cours && st.cours.id === ai) st.cours = null; delete st.pauses[ai]; if (st.direct) delete st.direct[ai]; saveLocal(); } }
+    else if (a === 'reprendre') { var ri = b.dataset.id, rs = (st.cours && st.cours.id === ri) ? st.cours : st.pauses[ri] || (st.direct && st.direct[ri] ? { id: ri, disc: st.direct[ri].disc, pas: st.direct[ri].pas || '', date: st.direct[ri].date, tireurs: st.direct[ri].tireurs, tirs: st.direct[ri].tirs.slice(), ack: st.direct[ri].tirs.length } : null);
+      if (rs) { if (st.cours && st.cours.id !== ri) st.pauses[st.cours.id] = st.cours; delete st.pauses[ri]; st.cours = rs; if (rs.ack === undefined) rs.ack = 0; saveLocal(); vivre(); st.ecran = 'tir'; window.scrollTo(0, 0); } }
     else if (a === 'voir') { st.vue = b.dataset.id; st.copie = ''; st.msg = ''; st.ecran = 'resultat'; }
     else if (a === 'suppr' || a === 'dellic') st.suppr = b.dataset.id;
         else if (a === 'dellicOk') { delete st.lic[b.dataset.id]; saveLocal(); retirer('licencies', b.dataset.id); }
