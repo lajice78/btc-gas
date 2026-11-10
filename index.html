@@ -286,7 +286,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   var CLUB_MAIL = ''; // adresse de la boîte du club (à renseigner)
   var HORS = !(window.claude && window.claude.use); // version hébergée, hors Claude
   var app = document.getElementById('app');
-  var st = { ecran: 'accueil', lic: {}, ses: {}, cours: null, planche: null, vue: null, edit: false, msg: '', copie: '', suppr: null, clubOk: false, fiche: null };
+  var st = { ecran: 'accueil', lic: {}, ses: {}, cours: null, planche: null, vue: null, edit: false, msg: '', copie: '', suppr: null, gdisc: 'DTL', clubOk: false, fiche: null };
   var db = null, dl = null, sync = 'attente', heroAnim = true, ecranVu = '';
 
   /* ---- stockage local (confort, peut manquer) ---- */
@@ -311,7 +311,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     snap.docs.forEach(function (d) { var v = d.data(); if (!v) return; vus[d.id] = 1; loc[d.id] = Object.assign({}, v, { _s: 1 }); });
     if (!snap.metadata.fromCache) Object.keys(loc).forEach(function (id) {
       if (vus[id]) return;
-      if (loc[id]._s) delete loc[id];               // supprimé ailleurs
+      if (loc[id]._s && col !== 'sessions') delete loc[id]; // supprimé ailleurs (licenciés seulement)
       else pousser(col, id, corps(loc[id]));        // créé hors ligne ici
     });
     saveLocal();
@@ -443,7 +443,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       '<button data-act="nouv" data-d="DTL"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M60 14L22 2"/><path d="M60 14V0"/><path d="M60 14L98 2"/></g><rect x="52" y="12" width="16" height="7" rx="2" fill="#ff6a1f"/><g fill="currentColor"><circle cx="16" cy="40" r="5"/><circle cx="38" cy="47" r="5"/><circle cx="60" cy="50" r="5"/><circle cx="82" cy="47" r="5"/><circle cx="104" cy="40" r="5"/></g></svg><b>DTL</b><span>5 tireurs, 5 plateaux par poste<br>3 pts / 2 pts / 0</span></button>' +
       '<button data-act="nouv" data-d="FU"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M16 14L4 0"/><path d="M38 14L46 0"/><path d="M60 14V0"/><path d="M82 14L72 0"/><path d="M104 14L116 0"/></g><g fill="#ff6a1f"><rect x="10" y="12" width="12" height="7" rx="2"/><rect x="32" y="12" width="12" height="7" rx="2"/><rect x="54" y="12" width="12" height="7" rx="2"/><rect x="76" y="12" width="12" height="7" rx="2"/><rect x="98" y="12" width="12" height="7" rx="2"/></g><g fill="currentColor"><circle cx="16" cy="48" r="5"/><circle cx="38" cy="48" r="5"/><circle cx="60" cy="48" r="5"/><circle cx="82" cy="48" r="5"/><circle cx="104" cy="48" r="5"/></g></svg><b>FU</b><span>Fosse universelle, 6 tireurs<br>1 pt par plateau cassé</span></button></div></div>';
     var n = Object.keys(st.ses).length, l = Object.keys(st.lic).length;
-    h += '<div class="stack"><button data-act="aller" data-e="historique">Feuilles enregistrées (' + n + ')</button></div>';
+    h += '<div class="stack"><button data-act="aller" data-e="general">Classement général</button><button data-act="aller" data-e="historique">Feuilles enregistrées (' + n + ')</button></div>';
     h += '<button class="ghost" data-act="aller" data-e="club">Espace club</button>';
     h += '<button class="ghost" data-act="skin">Affichage : passer en ' + (st.skin === 'sombre' ? 'clair' : 'sombre') + '</button>';
     h += '<p class="small muted">' + (sync === 'ok' ? 'Les feuilles sont partagées entre les téléphones connectés.' : 'Les feuilles sont gardées sur ce téléphone.') + ' La liste des licenciés est tenue par le club.' + '</p>';
@@ -506,6 +506,23 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     h += '<button data-act="rejouer">Nouvelle planche avec les mêmes tireurs</button></div>';
     return h;
   }
+  function general(disc) {
+    var m = {};
+    Object.keys(st.ses).forEach(function (id) { var s = st.ses[id]; if (s.disc !== disc) return;
+      bilan(s).forEach(function (x) { var k = slug(x.nom), o = m[k] || (m[k] = { nom: x.nom, n: 0, tot: 0, best: 0, inv: true }); o.n++; o.tot += x.total; if (x.total > o.best) o.best = x.total; if (s.tireurs[x.i].statut !== 'invite') o.inv = false; }); });
+    var a = Object.keys(m).map(function (k) { m[k].moy = m[k].tot / m[k].n; return m[k]; });
+    a.sort(function (p, q) { return q.moy - p.moy || q.best - p.best || q.n - p.n || p.nom.localeCompare(q.nom, 'fr'); });
+    a.forEach(function (o, j) { o.rang = (j > 0 && a[j - 1].moy === o.moy) ? a[j - 1].rang : j + 1; });
+    return a;
+  }
+  function vGeneral() {
+    var d = st.gdisc, a = general(d), mx = maxPts(d);
+    var h = entete('Classement', 'accueil') + '<div class="row"><button style="flex:1"' + (d === 'DTL' ? ' class="primary"' : '') + ' data-act="gdisc" data-d="DTL">DTL</button><button style="flex:1"' + (d === 'FU' ? ' class="primary"' : '') + ' data-act="gdisc" data-d="FU">FU</button></div>';
+    if (!a.length) return h + '<p class="muted">Aucune série ' + d + ' enregistrée pour le moment.</p>';
+    h += '<div class="card"><h2>Classement général ' + d + '</h2>';
+    a.forEach(function (o) { h += '<div class="rank' + (o.rang === 1 ? ' first' : '') + '"><span class="rg">' + o.rang + '</span><span><b>' + esc(o.nom) + '</b><br><span class="small muted">' + o.n + ' série' + (o.n > 1 ? 's' : '') + ' · meilleure ' + o.best + ' · total ' + o.tot + (o.inv ? ' · invité' : '') + '</span></span><span class="sc">' + (Math.round(o.moy * 10) / 10).toString().replace('.', ',') + '<small>/' + mx + '</small></span></div>'; });
+    return h + '</div><p class="small muted">Classé sur la moyenne par série de 25 plateaux, toutes feuilles enregistrées confondues.</p>';
+  }
   function vHisto() {
     var ids = Object.keys(st.ses).sort(function (a, b) { return st.ses[b].date - st.ses[a].date; });
     var h = entete('Feuilles', 'accueil');
@@ -513,7 +530,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     h += '<div class="card">';
     ids.forEach(function (id) { var s = st.ses[id], c = classement(s)[0];
       h += '<div class="item col"><span><b>' + s.disc + '</b> · ' + fdate(s.date) + '<br><span class="small muted">' + s.tireurs.length + ' tireur(s) · 1er : ' + esc(c.nom) + ' ' + c.total + '/' + maxPts(s.disc) + '</span></span><span class="row">' +
-        (st.suppr === id ? '<button data-act="supprOk" data-id="' + id + '">Confirmer</button>' : '<button class="primary" data-act="envoi" data-id="' + id + '">Envoyer</button><button data-act="voir" data-id="' + id + '">Ouvrir</button><button class="link" data-act="suppr" data-id="' + id + '">Supprimer</button>') + '</span></div>'; });
+        '<button class="primary" data-act="envoi" data-id="' + id + '">Envoyer</button><button data-act="voir" data-id="' + id + '">Ouvrir</button>' + '</span></div>'; });
     return h + '</div>';
   }
   function vLic() {
@@ -545,7 +562,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     return h + '</div>';
   }
   function render() {
-    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub }[st.ecran] || vAccueil;
+    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral }[st.ecran] || vAccueil;
     app.innerHTML = v();
     if (st.ecran !== ecranVu) { ecranVu = st.ecran; app.classList.remove('in'); void app.offsetWidth; app.classList.add('in'); }
     hero3d(); syn3d();
@@ -706,10 +723,10 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'abandon') { st.cours = null; saveLocal(); }
     else if (a === 'voir') { st.vue = b.dataset.id; st.copie = ''; st.msg = ''; st.ecran = 'resultat'; }
     else if (a === 'suppr' || a === 'dellic') st.suppr = b.dataset.id;
-    else if (a === 'supprOk') { delete st.ses[b.dataset.id]; saveLocal(); retirer('sessions', b.dataset.id); }
-    else if (a === 'dellicOk') { delete st.lic[b.dataset.id]; saveLocal(); retirer('licencies', b.dataset.id); }
+        else if (a === 'dellicOk') { delete st.lic[b.dataset.id]; saveLocal(); retirer('licencies', b.dataset.id); }
     else if (a === 'addlic') { var n = document.getElementById('newlic'); ajouterLic(n.value); }
     else if (a === 'edit') st.edit = !st.edit;
+    else if (a === 'gdisc') st.gdisc = b.dataset.d;
     else if (a === 'skin') { st.skin = st.skin === 'sombre' ? 'clair' : 'sombre'; lset('btc.skin2', st.skin); peau(); }
     else if (a === 'cell') { if (!st.edit) return; s = st.ses[st.vue]; var idx = (+b.dataset.k) * s.tireurs.length + (+b.dataset.i), r = s.tirs[idx]; s.tirs[idx] = r === 1 ? 2 : r === 2 ? 0 : 1; saveLocal(); pousser('sessions', s.id, corpsSes(s)); }
     else if (a === 'rejouer') { s = st.ses[st.vue]; nouvellePlanche(s.disc, s.tireurs.map(function (t) { return t.nom; })); }
