@@ -335,7 +335,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       [['sessions', 'ses', res[0]], ['licencies', 'lic', res[1]]].forEach(function (t) {
         var col = t[0], cle = t[1], dist = t[2], loc = st[cle];
         Object.keys(dist).forEach(function (id) { if (loc[id] && loc[id]._d) { fbSet(col, cle, id); return; } loc[id] = Object.assign(col === 'licencies' ? (loc[id] || {}) : {}, dist[id], { _s: 1 }); if (col === 'sessions') loc[id].id = id; });
-        Object.keys(loc).forEach(function (id) { if (dist[id]) return; if (col === 'licencies' && loc[id]._s && !loc[id]._d) delete loc[id]; else fbSet(col, cle, id); });
+        Object.keys(loc).forEach(function (id) { if (dist[id]) return; if (loc[id]._s && !loc[id]._d) delete loc[id]; /* déjà envoyé puis retiré par l'administrateur */ else fbSet(col, cle, id); });
       });
       fbVu = Date.now(); fbCours = false; sync = 'ok'; saveLocal(); if (st.ecran !== 'tir' && st.ecran !== 'planche' && st.ecran !== 'club') render();
     }).catch(function () { fbCours = false; if (sync !== 'ok') { sync = 'local'; render(); } });
