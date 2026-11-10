@@ -282,6 +282,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
 <script>
 (function () {
   var CLUB = 'BTC GAS';
+  var PURGE = 1794306349000; // les feuilles d'essai antérieures à cette date sont écartées
   var CLUB_PASS = '0000'; // mot de passe provisoire de l'espace club
   var CLUB_MAIL = ''; // adresse de la boîte du club (à renseigner)
   var HORS = !(window.claude && window.claude.use); // version hébergée, hors Claude
@@ -296,6 +297,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   st.skin = lget('btc.skin2', 'sombre');
   function peau() { document.documentElement.classList.toggle('clair', st.skin !== 'sombre'); }
   peau();
+  Object.keys(st.ses).forEach(function (id) { if (!(st.ses[id].date >= PURGE)) delete st.ses[id]; });
+  if (st.cours && !(st.cours.date >= PURGE)) st.cours = null;
   function saveLocal() { lset('btc.lic', st.lic); lset('btc.ses', st.ses); lset('btc.cours', st.cours); }
 
   function slug(n) { return n.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'x'; }
@@ -334,7 +337,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     Promise.all([fbListe('sessions', '', {}), fbListe('licencies', '', {})]).then(function (res) {
       [['sessions', 'ses', res[0]], ['licencies', 'lic', res[1]]].forEach(function (t) {
         var col = t[0], cle = t[1], dist = t[2], loc = st[cle];
-        Object.keys(dist).forEach(function (id) { if (loc[id] && loc[id]._d) { fbSet(col, cle, id); return; } loc[id] = Object.assign(col === 'licencies' ? (loc[id] || {}) : {}, dist[id], { _s: 1 }); if (col === 'sessions') loc[id].id = id; });
+        Object.keys(dist).forEach(function (id) { if (col === 'sessions' && !(dist[id].date >= PURGE)) { delete dist[id]; delete loc[id]; return; } if (loc[id] && loc[id]._d) { fbSet(col, cle, id); return; } loc[id] = Object.assign(col === 'licencies' ? (loc[id] || {}) : {}, dist[id], { _s: 1 }); if (col === 'sessions') loc[id].id = id; });
         Object.keys(loc).forEach(function (id) { if (dist[id]) return; if (loc[id]._s && !loc[id]._d) delete loc[id]; /* déjà envoyé puis retiré par l'administrateur */ else fbSet(col, cle, id); });
       });
       fbVu = Date.now(); fbCours = false; sync = 'ok'; saveLocal(); if (st.ecran !== 'tir' && st.ecran !== 'planche' && st.ecran !== 'club') render();
@@ -344,7 +347,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function retirer(col, id) { if (HORS) { fetch(FB + col + '/' + encodeURIComponent(id), { method: 'DELETE' }).catch(function () {}); return; } if (!db) return; db.collection(col).doc(id).delete().catch(function () {}); }
   function fusion(col, cle, snap, corps) {
     var loc = st[cle], vus = {};
-    snap.docs.forEach(function (d) { var v = d.data(); if (!v) return; vus[d.id] = 1; loc[d.id] = Object.assign({}, v, { _s: 1 }); });
+    snap.docs.forEach(function (d) { var v = d.data(); if (!v) return; if (col === 'sessions' && !(v.date >= PURGE)) { retirer(col, d.id); return; } vus[d.id] = 1; loc[d.id] = Object.assign({}, v, { _s: 1 }); });
     if (!snap.metadata.fromCache) Object.keys(loc).forEach(function (id) {
       if (vus[id]) return;
       if (loc[id]._s && col !== 'sessions') delete loc[id]; // supprimé ailleurs (licenciés seulement)
