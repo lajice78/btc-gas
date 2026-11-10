@@ -244,6 +244,7 @@ input[type=password],input[type=tel],input[type=email]{font:inherit;color:var(--
 .hero.on3d .pill{left:auto;right:14px;top:16px}
 .mur{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
 #app.large{max-width:1500px}
+.clic{cursor:pointer}
 #app.large *{animation:none!important} /* l'écran se rafraîchit toutes les 6 s : pas de clignotement */
 .sup{display:grid;gap:18px;align-items:start}
 @media(min-width:1000px){.sup{grid-template-columns:1.25fr 1fr}}
@@ -599,7 +600,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function vResultat() {
     var s = st.ses[st.vue]; if (!s) return vAccueil();
     var c = classement(s), d = s.disc === 'DTL', mx = maxPts(s.disc);
-    var h = entete('Résultat ' + s.disc, 'accueil') + '<p class="muted">' + fdate(s.date) + '</p><div class="syn"><span class="cap"></span></div><div class="card"><h2>Classement</h2>';
+    var h = entete('Résultat ' + s.disc, st.retour || 'accueil') + '<p class="muted">' + fdate(s.date) + '</p><div class="syn"><span class="cap"></span></div><div class="card"><h2>Classement</h2>';
     c.forEach(function (x) { h += '<div class="rank' + (x.rang === 1 ? ' first' : '') + '"><span class="rg">' + x.rang + '</span><span><b>' + esc(x.nom) + '</b><br><span class="small muted">' + (d ? x.casses + '/25 cassés, ' : '') + x.premier + ' au 1er coup' + (s.tireurs[x.i].statut === 'invite' ? ' · invité' : '') + (x.exaequo ? ' · ex æquo, barrage' : '') + '</span></span><span class="sc">' + x.total + '<small>/' + mx + '</small></span></div>'; });
     h += '</div><div class="row" style="justify-content:space-between"><h2>Grille de marque</h2>' + (st.clubOk ? '<button class="ghost" data-act="edit">' + (st.edit ? 'Terminer la correction' : 'Corriger un tir') + '</button>' : '') + '</div>';
     if (!st.clubOk) st.edit = false;
@@ -621,7 +622,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function general(disc, type, qui, min3, depuis) {
     type = type || 'moy'; var m = {}, now = new Date(), m0 = new Date(now.getFullYear(), now.getMonth(), 1).getTime(), add = function (p, q) { return p + q; };
     Object.keys(st.ses).forEach(function (id) { var s = st.ses[id]; if (s.disc !== disc || (type === 'mois' && s.date < m0) || (depuis && s.date < depuis)) return;
-      bilan(s).forEach(function (x) { var k = slug(x.nom), o = m[k] || (m[k] = { nom: x.nom, n: 0, tot: 0, best: 0, inv: true, L: [] }); o.n++; o.tot += x.total; if (x.total > o.best) o.best = x.total; if (s.tireurs[x.i].statut !== 'invite') o.inv = false; o.L.push([s.date, x.total]); }); });
+      bilan(s).forEach(function (x) { var k = slug(x.nom), o = m[k] || (m[k] = { nom: x.nom, n: 0, tot: 0, best: 0, inv: true, L: [] }); o.n++; o.tot += x.total; if (x.total > o.best || !o.bid) { o.best = Math.max(o.best, x.total); o.bid = id; } if (s.tireurs[x.i].statut !== 'invite') o.inv = false; o.L.push([s.date, x.total]); }); });
     var a = Object.keys(m).map(function (k) {
       var o = m[k]; o.moy = o.tot / o.n; o.L.sort(function (p, q) { return p[0] - q[0]; }); var t = o.L.map(function (e) { return e[1]; }), d = t.slice().sort(function (p, q) { return q - p; });
       o.b4 = d.slice(0, 4).reduce(add, 0); o.prog = o.n >= 6 ? (t.slice(-3).reduce(add, 0) - t.slice(0, 3).reduce(add, 0)) / 3 : 0;
@@ -656,9 +657,9 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (!HORS) return h + '<p class="muted">Cet écran fonctionne sur la version ouverte par le QR code.</p>';
     var J = new Date(); J.setHours(0, 0, 0, 0); var t0 = [J.getTime(), J.getTime() - ((J.getDay() + 6) % 7) * 86400000, new Date(J.getFullYear(), J.getMonth(), 1).getTime(), new Date(J.getFullYear(), 0, 1).getTime()], PN = ['Jour', 'Semaine', 'Mois', 'Année'], PT = ['du jour', 'de la semaine', 'du mois', "de l'année"];
     var tous = Object.keys(st.ses).map(function (id) { return st.ses[id]; }), duJour = tous.filter(function (s) { return s.date >= t0[0]; }), nbS = duJour.reduce(function (p, s) { return p + s.tireurs.length; }, 0);
-    function rec(depuis) { var o = null; ['DTL', 'FU'].forEach(function (dc) { if (o) return; tous.forEach(function (s) { if (s.disc !== dc || s.date < depuis) return; bilan(s).forEach(function (x) { if (!o || x.total > o.v) o = { v: x.total, nom: x.nom, d: dc }; }); }); }); return o; }
+    function rec(depuis) { var o = null; ['DTL', 'FU'].forEach(function (dc) { if (o) return; Object.keys(st.ses).forEach(function (id) { var s = st.ses[id]; if (s.disc !== dc || s.date < depuis) return; bilan(s).forEach(function (x) { if (!o || x.total > o.v) o = { v: x.total, nom: x.nom, d: dc, id: id }; }); }); }); return o; }
     function kpi(v, lab) { return '<div class="kpi"><b>' + v + '</b><span>' + lab + '</span></div>'; }
-    function krec(o, lab) { return o ? '<div class="kpi"><b>' + o.v + '<small>/' + maxPts(o.d) + '</small></b><span>' + lab + ' ' + o.d + ' · ' + esc(nomCourt(o.nom)) + '</span></div>' : kpi('-', lab); }
+    function krec(o, lab) { return o ? '<div class="kpi clic" role="button" tabindex="0" data-act="voir" data-id="' + o.id + '"><b>' + o.v + '<small>/' + maxPts(o.d) + '</small></b><span>' + lab + ' ' + o.d + ' · ' + esc(nomCourt(o.nom)) + '</span></div>' : kpi('-', lab); }
     h += '<div class="card"><div class="kpis">' + kpi(L.length, 'planche' + (L.length > 1 ? 's' : '') + ' en cours') + kpi(nbS, 'séries aujourd\'hui') + kpi(nbS * NB, 'plateaux du jour') + krec(rec(t0[0]), 'meilleure du jour') + krec(rec(t0[2]), 'record du mois') + krec(rec(t0[3]), 'record de l\'année') + '</div></div>';
     h += '<div class="sup"><div class="stack">';
     if (!L.length) h += '<div class="card"><h2>Aucune planche en cours</h2><p class="muted">Les planches apparaissent ici dès qu\'elles démarrent, et se mettent à jour à chaque tir.</p></div>';
@@ -673,9 +674,11 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     h += '</div></div><div class="stack"><div class="chips">' + PN.map(function (n, k) { return '<button' + (st.dper === k ? ' class="primary"' : '') + ' data-act="dper" data-k="' + k + '">' + n + '</button>'; }).join('') + '</div>';
     var vide = true; ['DTL', 'FU'].forEach(function (dc) {
       var a = general(dc, 'moy', 'tous', false, t0[st.dper]); if (!a.length) return; vide = false;
-      h += '<div class="card"><h2>Classement ' + PT[st.dper] + ' · ' + dc + '</h2>' + a.slice(0, 6).map(function (o) { return '<div class="rank' + (o.rang === 1 ? ' first' : '') + '"><span class="rg">' + o.rang + '</span><span><b>' + esc(o.nom) + '</b><br><span class="small muted">' + o.n + ' série' + (o.n > 1 ? 's' : '') + ' · meilleure ' + o.best + '</span></span><span class="sc">' + (Math.round(o.moy * 10) / 10).toString().replace('.', ',') + '<small>/' + maxPts(dc) + '</small></span></div>'; }).join('') + '</div>'; });
+      h += '<div class="card"><h2>Classement ' + PT[st.dper] + ' · ' + dc + '</h2>' + a.slice(0, 6).map(function (o) { return '<div class="rank clic' + (o.rang === 1 ? ' first' : '') + '" role="button" tabindex="0" data-act="voir" data-id="' + o.bid + '"><span class="rg">' + o.rang + '</span><span><b>' + esc(o.nom) + '</b><br><span class="small muted">' + o.n + ' série' + (o.n > 1 ? 's' : '') + ' · meilleure ' + o.best + '</span></span><span class="sc">' + (Math.round(o.moy * 10) / 10).toString().replace('.', ',') + '<small>/' + maxPts(dc) + '</small></span></div>'; }).join('') + '</div>'; });
     if (vide) h += '<div class="card"><h2>Classement ' + PT[st.dper] + '</h2><p class="muted">Aucune série enregistrée sur cette période.</p></div>';
-    h += '<p class="small muted">Moyenne par série de 25 plateaux. La période change toute seule toutes les 12 secondes.</p></div></div>';
+    var der = tous.filter(function (s) { return s.date >= t0[st.dper]; }).sort(function (p, q) { return q.date - p.date; }).slice(0, 5);
+    if (der.length) h += '<div class="card"><h2>Dernières feuilles ' + PT[st.dper] + '</h2>' + der.map(function (s) { var c = classement(s)[0]; return '<div class="item clic" role="button" tabindex="0" data-act="voir" data-id="' + s.id + '"><span><b>' + s.disc + '</b> · ' + fdate(s.date) + '<br><span class="small muted">' + s.tireurs.length + ' tireur(s) · 1er : ' + esc(c.nom) + ' ' + c.total + '/' + maxPts(s.disc) + '</span></span><span class="muted">›</span></div>'; }).join('') + '</div>';
+    h += '<p class="small muted">Moyenne par série de 25 plateaux. Touchez un résultat pour ouvrir la feuille (pour un tireur : sa meilleure série de la période). La période change toute seule toutes les 12 secondes.</p></div></div>';
     return h;
   }
   function vHisto() {
@@ -1064,7 +1067,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'abandon') { var ai = b.dataset.id || (st.cours && st.cours.id); if (ai) { mort(ai); if (st.cours && st.cours.id === ai) st.cours = null; delete st.pauses[ai]; if (st.direct) delete st.direct[ai]; saveLocal(); } }
     else if (a === 'reprendre') { var ri = b.dataset.id, rs = (st.cours && st.cours.id === ri) ? st.cours : st.pauses[ri] || (st.direct && st.direct[ri] ? { id: ri, disc: st.direct[ri].disc, pas: st.direct[ri].pas || '', date: st.direct[ri].date, tireurs: st.direct[ri].tireurs, tirs: st.direct[ri].tirs.slice(), ack: st.direct[ri].tirs.length } : null);
       if (rs) { if (st.cours && st.cours.id !== ri) st.pauses[st.cours.id] = st.cours; delete st.pauses[ri]; st.cours = rs; if (rs.ack === undefined) rs.ack = 0; saveLocal(); vivre(); st.ecran = 'tir'; window.scrollTo(0, 0); } }
-    else if (a === 'voir') { st.vue = b.dataset.id; st.copie = ''; st.msg = ''; st.ecran = 'resultat'; }
+    else if (a === 'voir') { st.retour = st.ecran === 'direct' ? 'direct' : st.ecran === 'historique' ? 'historique' : 'accueil'; st.vue = b.dataset.id; st.copie = ''; st.msg = ''; st.ecran = 'resultat'; }
     else if (a === 'suppr' || a === 'dellic') st.suppr = b.dataset.id;
         else if (a === 'dellicOk') { delete st.lic[b.dataset.id]; saveLocal(); retirer('licencies', b.dataset.id); }
     else if (a === 'addlic') { var n = document.getElementById('newlic'); ajouterLic(n.value); }
