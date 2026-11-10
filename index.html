@@ -68,6 +68,7 @@ input[type=text]{font:inherit;color:var(--ink);background:var(--field);border:1p
 input[type=text]::placeholder{color:var(--muted);opacity:.75}
 select.fsel{font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:18px;padding:12px 14px;width:100%;min-height:52px;-webkit-appearance:none;appearance:none}
 select.fsel option{color:#111;background:#fff}
+.btnf{display:flex;align-items:center;justify-content:center;min-height:52px;padding:0 16px;border-radius:18px;border:1px solid var(--line);background:var(--field);color:var(--ink);font-weight:600;cursor:pointer}
 input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
 .slot{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center}
 .slot .n{font-family:var(--display);font-weight:800;font-size:24px;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--surface2);border:2px solid var(--accent);color:var(--ink)}
@@ -523,14 +524,19 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   // fusils de ball-trap : grandes marques et leurs modèles superposés les plus répandus (« Autre » reste toujours possible)
   var FUS = { 'Beretta': ['686 Silver Pigeon I', '687 Silver Pigeon III', '690', '692', '694', 'DT11', 'SL3', 'Ultraleggero'], 'Browning': ['B525', 'B725', 'B725 Pro Trap', 'B725 Pro Sport', 'B825', 'B825 Sporter', 'B825 Pro Sport', 'B825 Pro Trap', 'Citori', 'Ultra XS', 'Cynergy', 'B15', 'B25'], 'Perazzi': ['MX8', 'MX12', 'MX2000', 'MX2000S', 'High Tech', 'TM1'], 'Krieghoff': ['K-80', 'K-20'], 'Blaser': ['F3', 'F16', 'FBT'], 'Caesar Guerini': ['Summit', 'Invictus', 'Tempio', 'Magnus', 'Ellipse'], 'Miroku': ['MK38', 'MK60', 'MK70', 'MK11'], 'Winchester': ['Select', '101'], 'Fabarm': ['Elos', 'Axis'], 'Zoli': ['Z-Sport', 'Kronos', 'Z-Gun'], 'Rizzini': ['BR110', 'BR460', 'Vertex', 'Artemis', 'S2000'], 'Benelli': ['828U'], 'Bettinsoli': ['Diamond', 'X-Trail', 'Omega'], 'Franchi': ['Feeling', 'Instinct'], 'FAIR': ['Carrera', 'Jubilee', 'Racing'], 'Kemen': ['KM4'], 'Verney-Carron': ['Sagittaire', 'Vercar'], 'Yildiz': ['Pro', 'SPZ ME'], 'ATA': ['SP'] };
-  var FOPT = { ty: ['Type', ['Superposé', 'Juxtaposé', 'Monocanon']], ca: ['Calibre', ['12', '16', '20', '28', '.410']], lc: ['Longueur des canons', ['66 cm', '71 cm', '76 cm', '81 cm', '86 cm']], cb: ['Choke du 1er coup', ['Cylindrique', '1/4', '1/2', '3/4', 'Full']], ch: ['Choke du 2e coup', ['Cylindrique', '1/4', '1/2', '3/4', 'Full']] };
+  var FOPT = { ty: ['Type', ['Superposé', 'Juxtaposé', 'Monocanon']], ca: ['Calibre', ['12', '16', '20', '28', '.410']], lc: ['Longueur des canons', ['66 cm', '71 cm', '76 cm', '81 cm', '86 cm']], ba: ['Bande de visée', ['Basse', 'Haute']], cr: ['Crosse', ['Sport', 'Trap', 'Réglable']], bo: ['Bois', ['Noyer clair', 'Noyer foncé', 'Synthétique noir']], bs: ['Bascule', ['Noire', 'Argentée', 'Jaspée']], ck: ['Chokes', ['Affleurants', 'Rallongés']], cb: ['Choke du 1er coup', ['Cylindrique', '1/4', '1/2', '3/4', 'Full']], ch: ['Choke du 2e coup', ['Cylindrique', '1/4', '1/2', '3/4', 'Full']] };
+  // préréglage d'après le nom du modèle : un fusil du bon genre (sport ou trap), pas la copie du modèle de la marque
+  function fPre(fu) { var n = (fu.mo || '').toLowerCase(), trap = /trap|dt11|mx|k-80|tm1|high tech|fbt|z-gun|kronos|invictus|km4|sl3/.test(n); fu.ty = n === 'tm1' ? 'Monocanon' : 'Superposé'; fu.ba = trap ? 'Haute' : 'Basse'; fu.cr = /pro |dt11|k-80|high tech|f3|f16|invictus|z-sport/.test(n) ? 'Réglable' : (trap ? 'Trap' : 'Sport'); fu.lc = fu.lc || (trap ? '76 cm' : '76 cm'); fu.ca = fu.ca || '12'; fu.bo = fu.bo || 'Noyer foncé'; fu.bs = /silver|687|summit|tempio|b525|mk/.test(n) ? 'Argentée' : (fu.bs || 'Noire'); fu.ck = /pro |dt11|sport|trap|k-80|f3|f16/.test(n) ? 'Rallongés' : 'Affleurants'; }
+  function fCle(f) { return ['ty', 'lc', 'ba', 'cr', 'bo', 'bs', 'ck'].map(function (o) { return f[o] || ''; }).join('|'); }
+  function fPhoto(k) { try { return lget('btc.fphoto', {})[k] || ''; } catch (e) { return ''; } }
   function fSel(id, L, v, vide) { return '<select id="' + id + '" class="fsel"><option value="">' + vide + '</option>' + L.map(function (x) { return '<option' + (x === v ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select>'; }
   function vFusil() {
     if (!st.membre) return vMembre(); var f = st.membre.fusil || {}, lab = function (t) { return '<p class="small muted" style="margin:8px 0 2px">' + t + '</p>'; }, marques = Object.keys(FUS).sort(), autreM = f.m && !FUS[f.m], mods = FUS[f.m] || [], autreMo = f.mo && mods.indexOf(f.mo) < 0;
-    var h = entete('Mon fusil', 'membre') + '<div class="card"><h2>' + esc(st.membre.nom) + '</h2>' + lab('Marque') + fSel('fmarque', marques.concat(['Autre']), autreM ? 'Autre' : (f.m || ''), 'Choisir une marque') + (autreM || f.mAutre ? '<input type="text" id="fmarqueA" style="margin-top:6px" autocomplete="off" maxlength="30" placeholder="Nom de la marque" value="' + esc(autreM ? f.m : '') + '">' : '');
+    var ph = fPhoto(st.membre.k), h = entete('Mon fusil', 'membre') + '<div class="card"><h2>' + esc(st.membre.nom) + '</h2>' + (window.THREE ? '<div class="syn av"><span class="cap">' + esc((f.m || '') + (f.mo ? ' ' + f.mo : '')) + '</span></div><p class="small muted" style="margin-top:6px">Aperçu d\'un fusil du même genre que le vôtre : il suit vos réglages, sans reproduire le dessin exact du modèle.</p>' : '') + lab('Marque') + fSel('fmarque', marques.concat(['Autre']), autreM ? 'Autre' : (f.m || ''), 'Choisir une marque') + (autreM || f.mAutre ? '<input type="text" id="fmarqueA" style="margin-top:6px" autocomplete="off" maxlength="30" placeholder="Nom de la marque" value="' + esc(autreM ? f.m : '') + '">' : '');
     h += lab('Modèle') + (mods.length ? fSel('fmodele', mods.concat(['Autre']), autreMo ? 'Autre' : (f.mo || ''), 'Choisir un modèle') : '') + (!mods.length || autreMo || f.moAutre ? '<input type="text" id="fmodeleA" style="margin-top:6px" autocomplete="off" maxlength="40" placeholder="Nom du modèle" value="' + esc(autreMo || !mods.length ? (f.mo || '') : '') + '">' : '');
     Object.keys(FOPT).forEach(function (o) { h += lab(FOPT[o][0]) + fSel('fo_' + o, FOPT[o][1], f[o] || '', 'Non précisé'); });
-    h += '<p class="small muted">Ces informations restent sur ce téléphone.</p></div>';
+    h += lab('Photo de mon fusil') + (ph ? '<img src="' + ph + '" alt="Photo de mon fusil" style="width:100%;border-radius:16px;display:block;margin-bottom:8px">' : '') + '<div class="row"><label class="btnf" style="flex:1">' + (ph ? 'Changer la photo' : 'Ajouter une photo') + '<input type="file" id="fphoto" accept="image/*" style="display:none"></label>' + (ph ? '<button class="ghost" style="flex:1" data-act="fphotoX">Retirer</button>' : '') + '</div>';
+    h += '<p class="small muted">Ces informations et la photo restent sur ce téléphone.</p></div>';
     return h + '<div class="card"><h2>Cartouches tirées' + (f.m ? ' · ' + esc(f.m) + (f.mo ? ' ' + esc(f.mo) : '') : '') + '</h2><div id="fcart">' + cartHtml(st.membre.k, f.man) + '</div>' + lab('Compteur manuel, ajouté à celui de l\'appli') + '<input type="text" inputmode="numeric" id="fman" autocomplete="off" maxlength="7" placeholder="0" value="' + (f.man ? f.man : '') + '"><p class="small muted">Le compteur de l\'appli se calcule tout seul d\'après vos feuilles terminées : 1 cartouche pour un plateau cassé au 1er coup, 2 pour un 2e coup ou un raté. Mettez dans le compteur manuel les cartouches tirées ailleurs ou avant l\'appli : il s\'ajoute au total.</p></div>';
   }
   function vAvatar() { if (!st.membre) return vMembre(); return entete('Mon avatar', 'membre') + '<div class="card">' + avEdit() + '</div>'; }
@@ -1354,6 +1360,39 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       conf.forEach(function (c) { c.position.y -= c.userData.v * dt; c.rotation.x += dt * 4; c.rotation.z += dt * 2.5; if (c.position.y < 0) { c.position.y = 5 + Math.random() * 1.5; c.position.x = (Math.random() - 0.5) * 7; } });
     }
     function plateau(t, o) { o.set(an.sx + an.dx * t, 0.75 + 6.2 * t - 4.6 * t * t, -9 - 8 * t); return o; }
+    var gFus = new T.Group(), fusK = null; gFus.visible = false; sc.add(gFus);
+    function faireFusil(c) {
+      while (gFus.children.length) { var o = gFus.children[0]; gFus.remove(o); o.traverse(function (q) { if (q.geometry) q.geometry.dispose(); }); }
+      var G = new T.Group(); gFus.add(G);
+      var L = (parseInt(c.lc, 10) || 76) / 100, ty = c.ty || 'Superposé', haute = c.ba === 'Haute', cr = c.cr || 'Sport';
+      var wd = M(c.bo === 'Noyer clair' ? 0xb07a45 : c.bo === 'Synthétique noir' ? 0x1c1d20 : 0x5a3620, { roughness: c.bo === 'Synthétique noir' ? 0.8 : 0.42 }), ac = M(0x16171a, { roughness: 0.32, metalness: 0.35 }), bas = M(c.bs === 'Argentée' ? 0xc9ccd1 : c.bs === 'Jaspée' ? 0x6f5f52 : 0x1b1c20, { roughness: 0.3, metalness: 0.45 }), gom = M(0x101113, { roughness: 0.95 });
+      var z0 = -0.09, zf = z0 - L, R = 0.0128, yT;
+      // canons
+      if (ty === 'Juxtaposé') { [-1, 1].forEach(function (sd) { seg(G, V(sd * 0.0135, 0, z0), V(sd * 0.0135, 0, zf), R, ac); }); yT = R; box(G, 0.006, 0.006, L, ac, 0, R * 0.6, z0 - L / 2); }
+      else if (ty === 'Monocanon') { seg(G, V(0, 0, z0), V(0, 0, zf), R * 1.05, ac); yT = R; }
+      else { seg(G, V(0, 0.0135, z0), V(0, 0.0135, zf), R, ac); seg(G, V(0, -0.0135, z0), V(0, -0.0135, zf), R, ac); yT = 0.0135 + R; [-1, 1].forEach(function (sd) { box(G, 0.002, 0.012, L * 0.98, ac, sd * 0.011, 0, z0 - L / 2); }); }
+      // bande de visée, ventilée, et guidon
+      var hb = haute ? 0.02 : 0.005, yB = yT + hb; box(G, 0.0095, 0.003, L, ac, 0, yB, z0 - L / 2);
+      for (var zz = z0 - 0.03; zz > zf + 0.02; zz -= 0.065) box(G, 0.004, hb, 0.008, ac, 0, yT + hb / 2 - 0.001, zz);
+      var gd = new T.Mesh(new T.SphereGeometry(0.0045, 10, 8), M(0xf2f2ee, { roughness: 0.3 })); gd.position.set(0, yB + 0.004, zf + 0.008); G.add(gd);
+      var md = new T.Mesh(new T.SphereGeometry(0.003, 8, 6), M(0xe8e4d8)); md.position.set(0, yB + 0.003, z0 - L / 2); G.add(md);
+      // chokes rallongés
+      if (c.ck === 'Rallongés') { var pc = ty === 'Juxtaposé' ? [[-0.0135, 0], [0.0135, 0]] : ty === 'Monocanon' ? [[0, 0]] : [[0, 0.0135], [0, -0.0135]]; pc.forEach(function (q) { seg(G, V(q[0], q[1], zf + 0.002), V(q[0], q[1], zf - 0.03), R * 1.12, M(0x2a2c31, { roughness: 0.3, metalness: 0.5 })); seg(G, V(q[0], q[1], zf - 0.012), V(q[0], q[1], zf - 0.017), R * 1.16, M(0xd9772b, { roughness: 0.4 })); }); }
+      // bascule, clé d'ouverture, pontet et détente
+      var lw = ty === 'Juxtaposé' ? 0.058 : 0.044, lh = ty === 'Juxtaposé' ? 0.05 : 0.068; box(G, lw, lh, 0.095, bas, 0, -0.003, -0.045); var ar = new T.Mesh(new T.CylinderGeometry(lh / 2, lh / 2, lw, 14, 1, false, 0, Math.PI), bas); ar.rotation.z = Math.PI / 2; ar.rotation.y = Math.PI; ar.position.set(0, -0.003, 0.002); G.add(ar);
+      box(G, 0.009, 0.007, 0.045, ac, 0, lh / 2 + 0.001, -0.012); var pt = new T.Mesh(new T.TorusGeometry(0.03, 0.0035, 6, 16, Math.PI), ac); pt.rotation.y = Math.PI / 2; pt.scale.y = -1; pt.position.set(0, -lh / 2 + 0.002, 0.012); G.add(pt); var dt = box(G, 0.005, 0.022, 0.007, M(0xc9a24a, { roughness: 0.3, metalness: 0.5 }), 0, -lh / 2 - 0.012, 0.008); dt.rotation.x = 0.3;
+      // devant en bois
+      var dv = box(G, lw + 0.004, 0.042, 0.25, wd, 0, ty === 'Juxtaposé' ? -0.022 : -0.03, z0 - 0.135); var nz = new T.Mesh(new T.SphereGeometry(0.021, 12, 8), wd); nz.scale.set((lw + 0.004) / 0.042, 1, 1.4); nz.position.set(0, dv.position.y, z0 - 0.26); G.add(nz);
+      // crosse : profil vu de côté, extrudé dans l'épaisseur
+      var sh = new T.Shape(), mc = cr === 'Trap', rg = cr === 'Réglable', yc = mc ? 0.03 : rg ? -0.004 : 0.014;
+      sh.moveTo(0, 0.03); sh.lineTo(0.06, 0.026); sh.quadraticCurveTo(0.11, 0.012, 0.15, yc);
+      if (mc) { sh.lineTo(0.33, 0.03); sh.lineTo(0.345, 0.004); sh.lineTo(0.385, 0.0); } else sh.lineTo(0.385, rg ? -0.012 : -0.006);
+      sh.lineTo(0.385, -0.125); sh.quadraticCurveTo(0.26, -0.1, 0.17, -0.075); sh.quadraticCurveTo(0.12, -0.07, 0.1, -0.105); sh.lineTo(0.07, -0.1); sh.quadraticCurveTo(0.06, -0.05, 0, -0.036); sh.closePath();
+      var cg = new T.ExtrudeGeometry(sh, { depth: 0.036, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 3, curveSegments: 10 }), cm = new T.Mesh(cg, wd); cm.rotation.y = -Math.PI / 2; cm.position.set(0.018, 0, 0.004); G.add(cm);
+      if (rg) { box(G, 0.04, 0.03, 0.17, wd, 0, 0.022, 0.245); [0.2, 0.29].forEach(function (zp) { seg(G, V(0, -0.006, zp), V(0, 0.01, zp), 0.005, M(0xc9ccd1, { roughness: 0.3, metalness: 0.5 })); }); }
+      box(G, 0.044, mc ? 0.13 : 0.122, 0.022, gom, 0, mc ? -0.062 : -0.066, 0.4);
+      G.position.z = -(0.41 + zf) / 2; K.ombre(G);
+    }
     function vetir(L) { tir.forEach(function (g, i) { var a = (L && L[i]) || avDef(i); if (g.userData.avk !== a) habiller(g, a, i); }); }
     function applique(L) { if (L.av) vetir(L.av); actif = L.actif; trapDTL.visible = L.disc === 'DTL'; trapFU.visible = L.disc !== 'DTL'; tir.forEach(function (g, i) { var c = L.pos[i]; if (!c) { g.visible = false; return; } if (!g.visible) { g.position.set(c.x, 0, c.z); g.visible = true; } g.userData.cx = c.x; g.userData.cz = c.z; g.userData.nom = nomCourt(L.noms[i]); }); }
     var v1 = V(0, 0, 0), v2 = V(0, 0, 0), bouche = V(0, 0, 0);
@@ -1362,6 +1401,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     function dessin(now) {
       taille(); var dt = Math.min(0.05, (now - last) / 1000), k = Math.min(1, dt * 6); last = now; feu.visible = false; fum.visible = false;
       if (mode === 'podium') { dessinPodium(now, dt); r.render(sc, cam); return; }
+      if (mode === 'fusil') { anneau.visible = clay.visible = pous.visible = false; tr[0].visible = tr[1].visible = false; fr.forEach(function (q) { q.visible = false; }); gFus.position.set(0, 1.6, 0); gFus.rotation.set(0, Math.PI / 2 + Math.sin(now / 2300) * 0.6, 0.05); cam.position.set(0, 1.52, 1.62); cam.lookAt(0, 1.6, 0); cam.updateProjectionMatrix(); r.render(sc, cam); return; }
       if (mode === 'apercu') { var g0 = tir[0]; anneau.visible = clay.visible = pous.visible = false; fr.forEach(function (q) { q.visible = false; }); tr[0].visible = tr[1].visible = false; g0.position.set(0, 0, 0); g0.rotation.y = Math.PI + Math.sin(now / 1700) * 0.9; g0.userData.lab.visible = false; g0.userData.haut.rotation.x = -0.62; cam.position.set(0, 1.35, 3.3); cam.lookAt(0, 1.0, 0); cam.updateProjectionMatrix(); r.render(sc, cam); return; }
       var t = an ? (now - an.t0) / 1000 : 0, hit = an ? (an.r === 1 ? 0.38 : an.r === 2 ? 0.66 : 99) : 0;
       tir.forEach(function (g, i) {
@@ -1391,19 +1431,21 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     document.addEventListener('visibilitychange', function () { if (!document.hidden && cv.isConnected) go(); });
     return {
       cv: cv, go: go,
-      apercu: function (a) { mode = 'apercu'; an = null; attente = null; gPas.visible = false; gPod.visible = false; vetir([a]); tir.forEach(function (g, i) { g.visible = i === 0; }); W = 0; },
-      podium: function (liste, av) { if (av) vetir(av); mode = 'podium'; an = null; attente = null; pod = liste; gPas.visible = false; gPod.visible = true; cadre(); },
-      maj: function (L, c) { cap = c; if (mode !== 'tir') { mode = 'tir'; gPas.visible = true; gPod.visible = false; tir.forEach(function (g, i) { g.visible = false; g.rotation.y = 0; g.userData.lab.visible = true; g.userData.lab.position.y = 2.2 + (i % 2) * 0.5; }); cadre(); } if (an && !calme) attente = L; else { an = null; applique(L); } },
+      fusil: function (c) { var k = fCle(c || {}); if (k !== fusK) { fusK = k; faireFusil(c || {}); } mode = 'fusil'; an = null; attente = null; gPas.visible = false; gPod.visible = false; tir.forEach(function (g) { g.visible = false; }); gFus.visible = true; W = 0; },
+      apercu: function (a) { gFus.visible = false; mode = 'apercu'; an = null; attente = null; gPas.visible = false; gPod.visible = false; vetir([a]); tir.forEach(function (g, i) { g.visible = i === 0; }); W = 0; },
+      podium: function (liste, av) { gFus.visible = false; if (av) vetir(av); mode = 'podium'; an = null; attente = null; pod = liste; gPas.visible = false; gPod.visible = true; cadre(); },
+      maj: function (L, c) { cap = c; if (mode !== 'tir') { mode = 'tir'; gFus.visible = false; gPas.visible = true; gPod.visible = false; tir.forEach(function (g, i) { g.visible = false; g.rotation.y = 0; g.userData.lab.visible = true; g.userData.lab.position.y = 2.2 + (i % 2) * 0.5; }); cadre(); } if (an && !calme) attente = L; else { an = null; applique(L); } },
       tir: function (i, poste, rr, disc) { if (calme || !tir[i].visible) return; attente = null; an = { i: i, r: rr, t0: performance.now(), sx: disc === 'DTL' ? 0 : X[Math.floor(Math.random() * 5)], dx: (Math.random() - 0.5) * 6 }; if (cap && cap.isConnected) cap.textContent = rr === 1 ? '1er coup' : rr === 2 ? '2e coup' : (disc === 'DTL' ? 'Raté' : 'Zéro'); },
       stop: function () { an = null; attente = null; clay.visible = false; tr[0].visible = tr[1].visible = false; fr.forEach(function (q) { q.visible = false; }); }
     };
   }
   function syn3d() {
-    var box = document.querySelector('.syn'), fin = st.ecran === 'resultat' ? st.ses[st.vue] : null, s = fin || st.cours, ap = st.ecran === 'avatar' && st.membre; if (!box || (!s && !ap) || !window.THREE) return;
+    var box = document.querySelector('.syn'), fin = st.ecran === 'resultat' ? st.ses[st.vue] : null, s = fin || st.cours, ap = st.ecran === 'avatar' && st.membre, af = st.ecran === 'fusil' && st.membre; if (!box || (!s && !ap && !af) || !window.THREE) return;
     var avs = function (q) { return q.tireurs.map(function (t) { return st.av[slug(t.nom)] || ''; }); };
     try {
       if (!SY) SY = creerSyn();
       if (SY.cv.parentNode !== box) box.appendChild(SY.cv); box.classList.add('on');
+      if (af) { SY.fusil(st.membre.fusil || {}); SY.go(); return; }
       if (ap) { SY.apercu(st.membre.av || st.av[st.membre.k] || avDef(0)); SY.go(); return; }
       if (fin) { SY.podium(classement(fin).slice(0, 3).map(function (x, n) { return { i: x.i, place: n, txt: x.rang + '. ' + nomCourt(x.nom) + ' · ' + x.total }; }), avs(fin)); SY.go(); return; }
       var e = etat(s), X = [-3, -1.5, 0, 1.5, 3], pris = {}, pos = [];
@@ -1419,14 +1461,19 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (st.membre && st.ecran === 'fusil' && t.id && t.id.charAt(0) === 'f') { var fu = st.membre.fusil || (st.membre.fusil = {}), redess = false;
       if (t.id === 'fmarque') { fu.mAutre = t.value === 'Autre'; fu.m = fu.mAutre ? '' : t.value; fu.mo = ''; fu.moAutre = false; redess = true; }
       else if (t.id === 'fmarqueA') fu.m = t.value.trim().slice(0, 30);
-      else if (t.id === 'fmodele') { fu.moAutre = t.value === 'Autre'; fu.mo = fu.moAutre ? '' : t.value; redess = true; }
+      else if (t.id === 'fmodele') { fu.moAutre = t.value === 'Autre'; fu.mo = fu.moAutre ? '' : t.value; if (fu.mo) fPre(fu); redess = true; }
+      else if (t.id === 'fphoto') return;
       else if (t.id === 'fmodeleA') fu.mo = t.value.trim().slice(0, 40);
-      else if (t.id.indexOf('fo_') === 0) fu[t.id.slice(3)] = t.value;
+      else if (t.id.indexOf('fo_') === 0) { fu[t.id.slice(3)] = t.value; if (SY && SY.fusil) try { SY.fusil(fu); } catch (e) {} }
       else if (t.id === 'fman') { fu.man = parseInt(t.value.replace(/\D/g, ''), 10) || 0; var fc = document.getElementById('fcart'); if (fc) fc.innerHTML = cartHtml(st.membre.k, fu.man); }
       else return;
       lset('btc.membre', st.membre); var FM = lget('btc.fusils', {}); FM[st.membre.k] = fu; lset('btc.fusils', FM); if (redess) render(); return; }
     if (t.dataset.slot !== undefined) { var i = +t.dataset.slot; st.planche.noms[i] = t.value; var m = document.getElementById('memo' + i); if (m) m.hidden = !(t.value.trim() && !st.lic[slug(t.value)]); }
     if (t.dataset.memo !== undefined) st.planche.memo[+t.dataset.memo] = t.checked;
+  });
+  app.addEventListener('change', function (ev) {
+    var t = ev.target; if (t.id !== 'fphoto' || !t.files || !t.files[0] || !st.membre) return;
+    var rd = new FileReader(); rd.onload = function () { var im = new Image(); im.onload = function () { try { var mx = 900, k = Math.min(1, mx / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); var P = lget('btc.fphoto', {}); P[st.membre.k] = c.toDataURL('image/jpeg', 0.8); lset('btc.fphoto', P); render(); } catch (e) { st.msg = 'La photo n\'a pas pu être enregistrée.'; render(); } }; im.src = rd.result; }; rd.readAsDataURL(t.files[0]);
   });
   app.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && ev.target.dataset && ev.target.dataset.slot !== undefined) { ev.preventDefault(); var nx = document.getElementById('t' + (+ev.target.dataset.slot + 1)); if (nx) { nx.focus(); nx.select(); } else { ev.target.blur(); var bd = app.querySelector('[data-act=demarrer]'); if (bd) bd.scrollIntoView({ block: 'center' }); } return; }
     if (ev.key === 'Enter' && ev.target.id === 'cpass') { var bb = app.querySelector('[data-act=clubin]'); if (bb) bb.click(); return; }
@@ -1440,6 +1487,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (a === 'av') { if (!st.membre) return; var ao = avLire(st.membre.av || st.av[st.membre.k], 0); ao[b.dataset.o] = +b.dataset.v; st.membre.av = avTxt(ao); st.av[st.membre.k] = st.membre.av; lset('btc.membre', st.membre); lset('btc.av', st.av); clearTimeout(avT); avT = setTimeout(avEnvoi, 900); var ys = window.scrollY; render(); window.scrollTo(0, ys); return; }
     if (a === 'voixsuiv') { var VL = voixFr(); if (VL.length) { var vi = 0; VL.forEach(function (x, i) { if (x.name === st.voixNom) vi = i; }); vi = (vi + 1) % VL.length; st.voixNom = VL[vi].name; lset('btc.voixNom', st.voixNom); dire('Voix ' + (vi + 1) + ' sur ' + VL.length + '. Paul Durand, poste 2.'); } return; }
     if (a === 'voix') { st.voix = !st.voix; lset('btc.voix', st.voix); if (st.voix) { dire('Voix activée'); prochDit = ''; } else { try { speechSynthesis.cancel(); } catch (e) {} } render(); return; }
+    if (a === 'fphotoX') { var PX = lget('btc.fphoto', {}); if (st.membre) delete PX[st.membre.k]; lset('btc.fphoto', PX); render(); return; }
     if (a === 'secu') { st.retourS = b.dataset.r || 'accueil'; st.ecran = 'securite'; window.scrollTo(0, 0); }
     if (a === 'aller') { if (b.dataset.e === 'concours') { fbConc(); st.cedit = null; } if (b.dataset.e === 'direct') dirGo(); if (b.dataset.e === 'accueil') fbDirect(); if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; }
     else if (a === 'lancre' || a === 'lancsave') {
