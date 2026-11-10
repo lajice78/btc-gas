@@ -244,6 +244,7 @@ input[type=password],input[type=tel],input[type=email]{font:inherit;color:var(--
 .hero.on3d .pill{left:auto;right:14px;top:16px}
 .mur{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
 #app.large{max-width:1500px}
+#app.large *{animation:none!important} /* l'écran se rafraîchit toutes les 6 s : pas de clignotement */
 .sup{display:grid;gap:18px;align-items:start}
 @media(min-width:1000px){.sup{grid-template-columns:1.25fr 1fr}}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px}
