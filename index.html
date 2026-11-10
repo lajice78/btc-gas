@@ -381,10 +381,29 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if ('mapValue' in v) { var o = {}, f = v.mapValue.fields || {}; Object.keys(f).forEach(function (k) { o[k] = fbDec(f[k]); }); return o; } return null;
   }
   var FKEY = 'AIzaSyC8s90-TqUktvhP0_3DarwqNB6Az2HT_zc', ADMIN_MAIL = 'admin@btc-gas.firebaseapp.com', jeton = null; // clé publique du projet, pas un secret
-  function fbAuth(verbe, code) { return fetch('https://identitytoolkit.googleapis.com/v1/accounts:' + verbe + '?key=' + FKEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: ADMIN_MAIL, password: 'btc-gas-' + code, returnSecureToken: true }) }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }); }
+  function fbAuth(verbe, code, mail) { return fetch('https://identitytoolkit.googleapis.com/v1/accounts:' + verbe + '?key=' + FKEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: mail || ADMIN_MAIL, password: 'btc-gas-' + code, returnSecureToken: true }) }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }); }
   // connexion ; au tout premier usage, le mot de passe saisi crée le compte administrateur
   function fbLogin(code) { return fbAuth('signInWithPassword', code).then(function (a) { if (a.ok) return a.j.idToken; return fbAuth('signUp', code).then(function (b) { if (b.ok) return b.j.idToken; throw new Error('refus'); }); }); }
-  function fbTete() { var h = { 'Content-Type': 'application/json' }; if (jeton) h.Authorization = 'Bearer ' + jeton; return h; }
+  function fbTete() { var h = { 'Content-Type': 'application/json' }, t = jeton || jetonM; if (t) h.Authorization = 'Bearer ' + t; return h; }
+  /* ---- espace membre : code du club + son nom ---- */
+  var MEMBRE_MAIL = 'membre@btc-gas.firebaseapp.com', jetonM = null, MEMBRES = lget('btc.mOn', false); // MEMBRES : l'administrateur a défini un code du club
+  st.membre = lget('btc.membre', null);
+  function fbMaj(idToken, code) { return fetch('https://identitytoolkit.googleapis.com/v1/accounts:update?key=' + FKEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: idToken, password: 'btc-gas-' + code, returnSecureToken: true }) }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }); }
+  function rafraichir() {
+    if (!HORS || !st.membre || !st.membre.rt) return;
+    fetch('https://securetoken.googleapis.com/v1/token?key=' + FKEY, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(st.membre.rt) }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (a) {
+      if (a.ok && a.j.id_token) { jetonM = a.j.id_token; if (a.j.refresh_token) { st.membre.rt = a.j.refresh_token; lset('btc.membre', st.membre); } }
+      else if (a.j && a.j.error) { st.membre = null; jetonM = null; lset('btc.membre', null); if (st.ecran === 'accueil' || st.ecran === 'membre') render(); } // le code du club a changé
+    }).catch(function () {});
+  }
+  function reglages() { if (!HORS) return; fetch(FB + 'reglages/club').then(function (r) { if (r.status === 200 || r.status === 404) { var on = r.status === 200; if (on !== MEMBRES) { MEMBRES = on; lset('btc.mOn', on); if (st.ecran === 'accueil') render(); } } }).catch(function () {}); }
+  function peutVoir(k) { return !HORS || st.clubOk || !!(st.membre && st.membre.k === k); }
+  function vMembre() {
+    var h = entete('Espace membre', 'accueil');
+    if (st.membre) return h + '<div class="card"><h2>' + esc(st.membre.nom) + '</h2><p class="muted">Vous êtes connecté sur ce téléphone.</p><button class="primary" data-act="tireur" data-k="' + st.membre.k + '">Mes statistiques</button><button class="ghost" data-act="membreout">Me déconnecter</button></div>';
+    var noms = licNoms();
+    return h + '<div class="card"><h2>Connexion</h2><p class="muted">' + (st.apres ? 'Il faut être connecté pour noter une planche. ' : '') + 'Saisissez le code du club, puis choisissez votre nom.</p><input type="password" id="mcode" autocomplete="off" placeholder="Code du club"><input type="text" id="mnom" list="dl-mb" autocomplete="off" placeholder="Votre nom"><datalist id="dl-mb">' + noms.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist><button class="primary" data-act="membrein">Me connecter</button>' + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '') + '</div>';
+  }
   function fbFiches() { if (!jeton) return; fetch(FB + 'fiches?pageSize=300', { headers: fbTete() }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (j) { (j.documents || []).forEach(function (d) { var id = d.name.split('/').pop(), v = fbDec({ mapValue: { fields: d.fields || {} } }); st.lic[id] = Object.assign(st.lic[id] || {}, v, { _s: 1 }); }); saveLocal(); if (st.ecran === 'club' && st.fiche === null) render(); }).catch(function () {}); }
   function fbCorps(col, x) { return col === 'licencies' ? { nom: x.nom } : corpsSes(x); }
   function fbSet(col, cle, id) {
@@ -431,7 +450,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   /* ---- planches en cours, visibles en direct au club-house ---- */
   var dirT = null, DIRECT_ON = true;
-  function vivre(s0) { var s = s0 || st.cours; if (!HORS || !DIRECT_ON || !s) return; fetch(FB + 'direct/' + encodeURIComponent(s.id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: fbEnc({ disc: s.disc, pas: s.pas || '', date: s.date, maj: Date.now(), tel: ME, num: s.num || '', no: s.no || 0, tireurs: s.tireurs, tirs: s.tirs }).mapValue.fields }) }).catch(function () {}); }
+  function vivre(s0) { var s = s0 || st.cours; if (!HORS || !DIRECT_ON || !s) return; fetch(FB + 'direct/' + encodeURIComponent(s.id), { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc({ disc: s.disc, pas: s.pas || '', date: s.date, maj: Date.now(), tel: ME, num: s.num || '', no: s.no || 0, tireurs: s.tireurs, tirs: s.tirs }).mapValue.fields }) }).catch(function () {}); }
   function mort(id) { if (!HORS || !DIRECT_ON || !id) return; fetch(FB + 'direct/' + encodeURIComponent(id), { method: 'DELETE' }).catch(function () {}); }
   function fbDirect() { if (!HORS || !DIRECT_ON) return; fbListe('direct', '', {}).then(function (d) { var av = Object.keys(st.direct || {}).join(); st.direct = d; var parti = false, ailleurs = function (c) { return c && d[c.id] && d[c.id].tel && d[c.id].tel !== ME && !(c.pris > Date.now() - 20000); };
     Object.keys(st.pauses).forEach(function (id) { if (ailleurs(st.pauses[id])) { delete st.pauses[id]; parti = true; } }); if (ailleurs(st.cours)) { st.cours = null; parti = true; if (st.ecran === 'tir') st.ecran = 'accueil'; } if (parti) saveLocal();
@@ -460,7 +479,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function numTxt(s) { return s && s.num ? 'Planche ' + numAff(s.num) + (s.no ? ' · n° ' + ('000' + s.no).slice(-4) : '') : ''; }
   function brancher() {
     if (HORS) {
-      sync = 'attente'; render(); fbSync(true); fbDirect(); chargerMeteo(); setInterval(function () { if (!document.hidden) chargerMeteo(); }, 15 * 60000);
+      sync = 'attente'; render(); fbSync(true); fbDirect(); chargerMeteo(); setInterval(function () { if (!document.hidden) chargerMeteo(); }, 15 * 60000); reglages(); rafraichir(); setInterval(function () { rafraichir(); reglages(); }, 40 * 60000);
       document.addEventListener('visibilitychange', function () { if (!document.hidden) fbSync(false); });
       try { var ml = document.createElement('link'); ml.rel = 'manifest'; ml.href = 'manifest.webmanifest'; document.head.appendChild(ml);
         var ic = document.createElement('link'); ic.rel = 'apple-touch-icon'; ic.href = 'icon-192.png'; document.head.appendChild(ic);
@@ -601,6 +620,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     h += '<div class="stack"><div class="disc">' +
       '<button data-act="nouv" data-d="DTL"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M60 14L22 2"/><path d="M60 14V0"/><path d="M60 14L98 2"/></g><rect x="52" y="12" width="16" height="7" rx="2" fill="#ff6a1f"/><g fill="currentColor"><circle cx="16" cy="40" r="5"/><circle cx="38" cy="47" r="5"/><circle cx="60" cy="50" r="5"/><circle cx="82" cy="47" r="5"/><circle cx="104" cy="40" r="5"/></g></svg><b>DTL</b><span>5 tireurs, 5 plateaux par poste<br>3 pts / 2 pts / 0</span></button>' +
       '<button data-act="nouv" data-d="FU"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M16 14L4 0"/><path d="M38 14L46 0"/><path d="M60 14V0"/><path d="M82 14L72 0"/><path d="M104 14L116 0"/></g><g fill="#ff6a1f"><rect x="10" y="12" width="12" height="7" rx="2"/><rect x="32" y="12" width="12" height="7" rx="2"/><rect x="54" y="12" width="12" height="7" rx="2"/><rect x="76" y="12" width="12" height="7" rx="2"/><rect x="98" y="12" width="12" height="7" rx="2"/></g><g fill="currentColor"><circle cx="16" cy="48" r="5"/><circle cx="38" cy="48" r="5"/><circle cx="60" cy="48" r="5"/><circle cx="82" cy="48" r="5"/><circle cx="104" cy="48" r="5"/></g></svg><b>FU</b><span>Fosse universelle, 6 tireurs<br>1 pt par plateau cassé</span></button></div></div>';
+    if (HORS) h += '<button class="link adm" style="opacity:.85;font-size:13px" data-act="aller" data-e="membre">' + (st.membre ? 'Mon espace · ' + esc(st.membre.nom) : 'Espace membre') + '</button>';
     h += '<button class="link adm" data-act="aller" data-e="club">Espace administrateur</button>';
     return h;
   }
@@ -686,7 +706,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (!a.length) return h + '<p class="muted">Aucune série ' + d + ' à classer ici pour le moment.</p><p class="small muted">' + expl + '</p>';
     function ligne(o) {
       var val = ty === 'best4' ? o.b4 + '<small>/' + (4 * mx) + '</small>' : ty === 'assid' ? o.tot + '<small> pts</small>' : ty === 'record' ? o.best + '<small>/' + mx + '</small>' : ty === 'prog' ? (o.ok ? (o.prog > 0 ? '+' : '') + dec(o.prog) + '<small> pts</small>' : '-') : dec(o.moy) + '<small>/' + mx + '</small>';
-      return '<div class="rank clic' + (o.rang === 1 ? ' first' : '') + '" role="button" tabindex="0" data-act="tireur" data-k="' + slug(o.nom) + '"><span class="rg">' + (o.rang || '-') + '</span><span><b>' + esc(o.nom) + '</b><br><span class="small muted">' + o.n + ' série' + (o.n > 1 ? 's' : '') + ' · meilleure ' + o.best + ' · moyenne ' + dec(o.moy) + ' · total ' + o.tot + (o.inv ? ' · invité' : '') + '</span></span><span class="sc">' + val + '</span></div>';
+      return '<div class="rank' + (o.rang === 1 ? ' first' : '') + (peutVoir(slug(o.nom)) ? ' clic" role="button" tabindex="0" data-act="tireur" data-k="' + slug(o.nom) : '') + '"><span class="rg">' + (o.rang || '-') + '</span><span><b>' + esc(o.nom) + '</b><br><span class="small muted">' + o.n + ' série' + (o.n > 1 ? 's' : '') + ' · meilleure ' + o.best + ' · moyenne ' + dec(o.moy) + ' · total ' + o.tot + (o.inv ? ' · invité' : '') + '</span></span><span class="sc">' + val + '</span></div>';
     }
     var ok = a.filter(function (o) { return o.ok; }), non = a.filter(function (o) { return !o.ok; });
     h += '<div class="card"><h2>' + GT.filter(function (g) { return g[0] === ty; })[0][1] + ' ' + d + '</h2>' + (ok.length ? ok.map(ligne).join('') : '<p class="muted">Personne n\'a encore assez de séries.</p>') + '</div>';
@@ -712,12 +732,14 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     return h;
   }
   function ouvrirPas(disc, pas) {
+    if (HORS && MEMBRES && !st.membre && !st.clubOk) { st.apres = { disc: disc, pas: pas || '' }; st.msg = ''; st.ecran = 'membre'; render(); window.scrollTo(0, 0); return; }
     var suite = function () { if (enCoursAu(disc, pas).length) { st.pasVu = { disc: disc, pas: pas || '' }; st.ecran = 'pas'; } else nouvellePlanche(disc, null, pas); render(); window.scrollTo(0, 0); };
     if (!HORS || !DIRECT_ON || navigator.onLine === false) return suite();
     var fait = false, une = function () { if (!fait) { fait = true; suite(); } }; setTimeout(une, 2500);
     fbListe('direct', '', {}).then(function (d) { st.direct = d; une(); }).catch(une);
   }
   function vTireur() {
+    if (!peutVoir(st.tireur)) return entete('Statistiques', st.retourT || 'general') + '<p class="muted">Les statistiques personnelles ne sont visibles que par le tireur lui-même, dans son espace membre, et par l\'administrateur.</p>';
     var k = st.tireur, h = '', nom = '', dec = function (v) { return (Math.round(v * 10) / 10).toString().replace('.', ','); };
     var corps = ''; ['DTL', 'FU'].forEach(function (dc) {
       var L = [], pl = 0, cas = 0, un = 0, po = [0, 0, 0, 0, 0], pn = [0, 0, 0, 0, 0], mx = maxPts(dc);
@@ -802,6 +824,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       return h;
     }
     var ids = Object.keys(st.lic).sort(function (a, b) { return st.lic[a].nom.localeCompare(st.lic[b].nom, 'fr'); });
+    if (HORS) h += '<div class="card"><h2>Code du club</h2><p class="small muted">' + (MEMBRES ? 'Un code du club est en service : il faut être connecté à l\'espace membre pour noter une planche.' : 'Aucun code défini : tout le monde peut noter avec le QR code. Définir un code réserve la notation aux membres connectés.') + '</p>' + (MEMBRES ? '<input type="password" id="ccold" autocomplete="off" placeholder="Code actuel du club">' : '') + '<input type="password" id="ccnew" autocomplete="off" placeholder="' + (MEMBRES ? 'Nouveau code du club' : 'Code du club (4 caractères minimum)') + '"><button data-act="codeclub">' + (MEMBRES ? 'Changer le code du club' : 'Définir le code du club') + '</button></div>' +
+      '<div class="card"><h2>Mot de passe administrateur</h2><input type="password" id="apnew" autocomplete="off" placeholder="Nouveau mot de passe (6 caractères minimum)"><button data-act="adminpass">Changer le mot de passe</button></div>' + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '');
     h += '<p class="small muted">Mode administrateur actif : correction d\'un tir et suppression d\'une feuille depuis « Gérer les feuilles ».</p><div class="row"><button style="flex:1" data-act="aller" data-e="historique">Gérer les feuilles</button><button style="flex:1" data-act="clublock">Verrouiller</button></div>';
     h += '<div class="card"><h2>Récupérer les feuilles (' + Object.keys(st.ses).length + ')</h2><p class="small muted">Fichiers lisibles dans Excel. La sauvegarde complète contient toutes les feuilles tir par tir.</p>' + ((dl || HORS) ? '<button data-act="xtout">Toutes les feuilles (CSV)</button><button data-act="xgen">Classement général (CSV)</button><button data-act="xjson">Sauvegarde complète (JSON)</button>' : '<p class="err">Téléchargement indisponible dans cette vue.</p>') + '</div>';
     h += '<button class="primary" data-act="fnew">Ajouter un licencié</button>';
@@ -818,7 +842,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) veille(); });
   function render() {
-    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral, direct: vDirect, pas: vPas, tireur: vTireur }[st.ecran] || vAccueil;
+    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral, direct: vDirect, pas: vPas, tireur: vTireur, membre: vMembre }[st.ecran] || vAccueil;
     app.innerHTML = v(); app.classList.toggle('large', st.ecran === 'direct'); veille();
     if (st.ecran !== ecranVu) { ecranVu = st.ecran; app.classList.remove('in'); void app.offsetWidth; app.classList.add('in'); }
     hero3d(); syn3d();
@@ -1146,7 +1170,35 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     var b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
     var a = b.dataset.act, s;
     if (a !== 'suppr' && a !== 'dellic' && a !== 'fdel' && a !== 'sesdel' && a !== 'seldel') st.suppr = null;
+    if (a === 'aller' && b.dataset.e !== 'membre') st.apres = null;
     if (a === 'aller') { if (b.dataset.e === 'direct') dirGo(); if (b.dataset.e === 'accueil') fbDirect(); if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; }
+    else if (a === 'membreout') { st.membre = null; jetonM = null; lset('btc.membre', null); }
+    else if (a === 'membrein') {
+      var mc = (document.getElementById('mcode') || {}).value || '', mn = ((document.getElementById('mnom') || {}).value || '').trim().replace(/\s+/g, ' '), mk = slug(mn);
+      if (!mc || !mn) { st.msg = 'Saisissez le code du club et votre nom.'; }
+      else if (Object.keys(st.lic).length && !st.lic[mk]) { st.msg = 'Ce nom n\'est pas dans la liste des licenciés. Choisissez-le dans la liste ou voyez l\'administrateur.'; }
+      else { b.disabled = true; b.textContent = 'Connexion…'; fbAuth('signInWithPassword', mc, MEMBRE_MAIL).then(function (r) {
+          if (!r.ok) { st.msg = navigator.onLine === false ? 'Pas de réseau : connexion impossible.' : 'Code du club incorrect.'; return render(); }
+          jetonM = r.j.idToken; st.membre = { nom: st.lic[mk] ? st.lic[mk].nom : mn, k: mk, rt: r.j.refreshToken }; lset('btc.membre', st.membre); st.msg = '';
+          var ap = st.apres; st.apres = null; if (ap) ouvrirPas(ap.disc, ap.pas); else { st.ecran = 'membre'; render(); }
+        }, function () { st.msg = 'Connexion impossible.'; render(); }); return; }
+    }
+    else if (a === 'codeclub') {
+      var cn = (document.getElementById('ccnew') || {}).value || '', co = (document.getElementById('ccold') || {}).value || '';
+      if (cn.length < 4) st.msg = 'Le code du club doit faire au moins 4 caractères.';
+      else { b.disabled = true; b.textContent = 'Enregistrement…';
+        (MEMBRES ? fbAuth('signInWithPassword', co, MEMBRE_MAIL).then(function (r) { if (!r.ok) throw 'Code actuel incorrect.'; return fbMaj(r.j.idToken, cn).then(function (u) { if (!u.ok) throw 'Le code n\'a pas pu être changé.'; }); })
+          : fbAuth('signUp', cn, MEMBRE_MAIL).then(function (r) { if (r.ok) return; return fbAuth('signInWithPassword', cn, MEMBRE_MAIL).then(function (r2) { if (!r2.ok) throw 'Un code du club existe déjà : saisissez-le pour le confirmer.'; }); }))
+          .then(function () { return fetch(FB + 'reglages/club', { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc({ membres: true, maj: Date.now() }).mapValue.fields }) }); })
+          .then(function (r) { if (!r.ok) throw 'Le réglage n\'a pas pu être enregistré.'; MEMBRES = true; lset('btc.mOn', true); st.msg = 'Code du club enregistré. Les membres doivent maintenant se connecter pour noter.'; render(); })
+          .catch(function (e) { st.msg = typeof e === 'string' ? e : 'Enregistrement impossible.'; render(); }); return; }
+    }
+    else if (a === 'adminpass') {
+      var np = (document.getElementById('apnew') || {}).value || '';
+      if (np.length < 6) st.msg = 'Le mot de passe doit faire au moins 6 caractères.';
+      else if (!jeton) st.msg = 'Reconnectez-vous à l\'espace administrateur.';
+      else { b.disabled = true; fbMaj(jeton, np).then(function (u) { if (!u.ok) throw 0; jeton = u.j.idToken || jeton; st.msg = 'Mot de passe administrateur changé.'; render(); }).catch(function () { st.msg = 'Le mot de passe n\'a pas pu être changé : reconnectez-vous puis réessayez.'; render(); }); return; }
+    }
     else if (a === 'clublock') { jeton = null; st.clubOk = false; st.edit = false; st.ecran = 'accueil'; }
     else if (a === 'sesdel') { st.suppr = st.vue; }
     else if (a === 'sel') { if (st.sel[b.dataset.id]) delete st.sel[b.dataset.id]; else st.sel[b.dataset.id] = 1; }
