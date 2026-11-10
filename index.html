@@ -265,7 +265,8 @@ input[type=password],input[type=tel],input[type=email]{font:inherit;color:var(--
 .hero .meteo:empty{display:none}
 .hero .cpt{position:absolute;right:14px;top:54px;z-index:3;padding:7px 12px;border-radius:14px;background:rgba(6,16,12,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;font-size:12px;line-height:1.4;text-align:right;text-shadow:0 1px 3px rgba(0,0,0,.5)}
 .hero .cpt b{font-size:17px;font-weight:800;color:#ffb070}
-.hero .meteo{max-width:52%!important}
+.hero .meteo{max-width:46%!important}
+.hero .cpt{max-width:50%;font-size:11.5px}
 .hero .meteo b{font-size:17px;font-weight:800;margin-right:4px}
 #app.club3d .hero.on3d{height:calc(100vh - 86px);height:calc(100dvh - 86px);max-height:940px;min-height:420px}
 .hero.on3d .sub{bottom:24px}
@@ -408,10 +409,12 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   var MET = { 0: 'Ciel dégagé', 1: 'Peu nuageux', 2: 'Éclaircies', 3: 'Couvert', 45: 'Brouillard', 48: 'Brouillard givrant', 51: 'Bruine', 53: 'Bruine', 55: 'Bruine', 56: 'Bruine verglaçante', 57: 'Bruine verglaçante', 61: 'Pluie faible', 63: 'Pluie', 65: 'Forte pluie', 66: 'Pluie verglaçante', 67: 'Pluie verglaçante', 71: 'Neige faible', 73: 'Neige', 75: 'Forte neige', 77: 'Neige en grains', 80: 'Averses', 81: 'Averses', 82: 'Fortes averses', 85: 'Averses de neige', 86: 'Averses de neige', 95: 'Orage', 96: 'Orage et grêle', 99: 'Orage et grêle' };
   // compteur de plateaux lancés : feuilles terminées + tirs déjà notés des planches en cours
   function compteurHtml() {
-    var J = new Date(); J.setHours(0, 0, 0, 0); var tj = J.getTime(), ta = new Date(J.getFullYear(), 0, 1).getTime(), jour = 0, an = 0, vus = {}, fr = function (n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); };
-    Object.keys(st.ses).forEach(function (id) { var c = st.ses[id]; vus[id] = 1; if (!(c.date >= ta)) return; var n = c.tirs ? c.tirs.length : 0; an += n; if (c.date >= tj) jour += n; });
-    [st.pauses, st.direct || {}, st.cours ? { c: st.cours } : {}].forEach(function (o) { Object.keys(o).forEach(function (k) { var c = o[k], id = (c && c.id) || k; if (!c || vus[id] || !c.tirs || !(c.date >= ta)) return; vus[id] = 1; an += c.tirs.length; if (c.date >= tj) jour += c.tirs.length; }); });
-    return '<span class="cpt"><b>' + fr(jour) + '</b> plateau' + (jour > 1 ? 'x' : '') + ' aujourd\'hui<br>' + fr(an) + ' cette année</span>';
+    var J = new Date(); J.setHours(0, 0, 0, 0); var tj = J.getTime(), ta = new Date(J.getFullYear(), 0, 1).getTime(), jour = 0, an = 0, cj = 0, ca = 0, vus = {}, fr = function (n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); };
+    // cartouches : 1 si le plateau est cassé au 1er coup, 2 s'il est cassé au 2e coup ou raté (les deux coups sont tirés)
+    function compte(c, id) { if (!c || vus[id] || !c.tirs || !(c.date >= ta)) return; vus[id] = 1; var n = c.tirs.length, k = 0; for (var i = 0; i < n; i++) k += c.tirs[i] === 1 ? 1 : 2; an += n; ca += k; if (c.date >= tj) { jour += n; cj += k; } }
+    Object.keys(st.ses).forEach(function (id) { compte(st.ses[id], id); });
+    [st.pauses, st.direct || {}, st.cours ? { c: st.cours } : {}].forEach(function (o) { Object.keys(o).forEach(function (k) { compte(o[k], (o[k] && o[k].id) || k); }); });
+    return '<span class="cpt"><b>' + fr(jour) + '</b> plateau' + (jour > 1 ? 'x' : '') + ' · <b>' + fr(cj) + '</b> cartouche' + (cj > 1 ? 's' : '') + '<br>aujourd\'hui<br>' + fr(an) + ' plateaux · ' + fr(ca) + ' cartouches<br>cette année</span>';
   }
   function meteoHtml() { var m = st.meteo; if (!m) return ''; var d = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'][Math.round(m.dir / 45) % 8]; return '<b>' + m.t + ' °C</b> ' + (MET[m.code] || '') + '<br>Vent ' + m.vent + ' km/h ' + d + (m.raf > m.vent + 4 ? ' · rafales ' + m.raf : ''); }
   function chargerMeteo() {
