@@ -404,7 +404,78 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function lancCompte(l) { var d = (st.lanceurs[l] || {}).depuis || 0, n = 0, vus = {}; [st.ses, st.pauses, st.direct || {}, st.cours ? { c: st.cours } : {}].forEach(function (o) { Object.keys(o).forEach(function (k) { var c = o[k], id = (c && c.id) || k; if (!c || vus[id] || c.pas !== l || !c.tirs || !(c.date >= d)) return; vus[id] = 1; n += c.tirs.length; }); }); return n; }
   function lancAlerte(l) { var o = st.lanceurs[l]; if (!o || !o.cap) return ''; var r = o.cap - lancCompte(l); return r <= Math.max(25, o.cap * 0.15) ? '<p class="err">Lanceur ' + STAND[l] + ' : il reste environ ' + Math.max(0, r) + ' plateaux, à recharger.</p>' : ''; }
   function lancSauve() { lset('btc.lanc', st.lanceurs); return fetch(FB + 'reglages/lanceurs', { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc(st.lanceurs).mapValue.fields }) }); }
+  st.cc = null; // { code, maj, per } lisible par l'administrateur seulement
+  function codePerime(c) { if (!c || !c.code || !c.per || c.per === 'jamais') return false; var J = new Date(); J.setHours(0, 0, 0, 0); var lim = c.per === 'jour' ? J.getTime() : J.getTime() - ((J.getDay() + 6) % 7) * 86400000; return !(c.maj >= lim); }
+  function codeChange(nv, per, ancien) {
+    var anc = ancien || (st.cc && st.cc.code) || '';
+    return (anc ? fbAuth('signInWithPassword', anc, MEMBRE_MAIL).then(function (r) { if (!r.ok) throw 'Code actuel incorrect.'; return fbMaj(r.j.idToken, nv).then(function (u) { if (!u.ok) throw 'Le code n\'a pas pu être changé.'; }); })
+      : fbAuth('signUp', nv, MEMBRE_MAIL).then(function (r) { if (r.ok) return; return fbAuth('signInWithPassword', nv, MEMBRE_MAIL).then(function (r2) { if (!r2.ok) throw 'Un code du club existe déjà : saisissez le code actuel pour le remplacer.'; }); }))
+      .then(function () { st.cc = { code: nv, maj: Date.now(), per: per || 'jamais' }; return fetch(FB + 'prive/code', { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc(st.cc).mapValue.fields }) }); })
+      .then(function (r) { if (!r.ok) throw 'Le code n\'a pas pu être enregistré.'; return fetch(FB + 'reglages/club', { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc({ membres: true, maj: Date.now() }).mapValue.fields }) }); })
+      .then(function (r) { if (!r.ok) throw 'Le réglage n\'a pas pu être enregistré.'; MEMBRES = true; lset('btc.mOn', true); });
+  }
+  function codeAuto() { var nv = String(1000 + Math.floor(Math.random() * 9000)); return codeChange(nv, st.cc.per).then(function () { st.msg = 'Nouveau code du club : ' + nv; }); }
+  function codeCharge() { if (!HORS || !jeton) return; fetch(FB + 'prive/code', { headers: fbTete() }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { st.cc = j ? fbDec({ mapValue: { fields: j.fields || {} } }) : { code: '', maj: 0, per: 'jamais' }; if (codePerime(st.cc)) return codeAuto().catch(function () {}); }).then(function () { if (st.ecran === 'club') render(); }).catch(function () {}); }
   function peutVoir(k) { return !HORS || st.clubOk || !!(st.membre && st.membre.k === k); }
+  /* ---- mode concours ---- */
+  st.conc = lget('btc.conc', {}); st.cid = null; st.cedit = null;
+  function fbConc() { if (!HORS) return; fbListe('concours', '', {}).then(function (d) { Object.keys(d).forEach(function (k) { d[k] = concLocal(d[k]); }); st.conc = d; lset('btc.conc', d); if (st.ecran === 'concours' || (st.ecran === 'conc' && !st.cedit)) render(); }).catch(function () {}); }
+  function concTag(c, id, m, g) { return c && c.concours === id && c.manche === m && c.groupe === g; }
+  function concEtat(id, m, g) {
+    var k = Object.keys(st.ses).filter(function (x) { return concTag(st.ses[x], id, m, g); })[0]; if (k) return { fait: st.ses[k], id: k };
+    var enc = [st.cours].concat(Object.keys(st.pauses).map(function (x) { return st.pauses[x]; }), Object.keys(st.direct || {}).map(function (x) { return st.direct[x]; })).filter(function (c) { return concTag(c, id, m, g); })[0];
+    return enc ? { cours: enc } : {};
+  }
+  function concClassement(id) {
+    var c = st.conc[id], N = Math.round(c.plateaux / NB), m = {};
+    (c.planches || []).forEach(function (pl) { pl.forEach(function (nom) { m[slug(nom)] = { nom: nom, k: slug(nom), s: [], tot: 0, n: 0 }; }); });
+    Object.keys(st.ses).forEach(function (x) { var s = st.ses[x]; if (s.concours !== id) return; bilan(s).forEach(function (b) { var o = m[slug(b.nom)] || (m[slug(b.nom)] = { nom: b.nom, k: slug(b.nom), s: [], tot: 0, n: 0 }); if (o.s[s.manche - 1] === undefined) { o.s[s.manche - 1] = b.total; o.tot += b.total; o.n++; } }); });
+    var bar = c.barrage || {}, a = Object.keys(m).map(function (k) { m[k].bar = bar[k] === undefined ? null : bar[k]; return m[k]; });
+    a.sort(function (p, q) { return q.tot - p.tot || (q.bar || 0) - (p.bar || 0) || p.nom.localeCompare(q.nom, 'fr'); });
+    a.forEach(function (o, j) { var p = a[j - 1]; o.rang = j > 0 && p.tot === o.tot && (p.bar || 0) === (o.bar || 0) ? p.rang : j + 1; });
+    a.forEach(function (o) { o.exq = a.filter(function (y) { return y.rang === o.rang; }).length > 1; }); return { a: a, N: N };
+  }
+  function composer(noms, taille, hasard) {
+    var L = noms.slice(); if (hasard) { L = L.filter(Boolean); for (var i = L.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = L[i]; L[i] = L[j]; L[j] = t; } }
+    var out = [], cur = []; L.forEach(function (n) { if (!n) { if (cur.length) { out.push(cur); cur = []; } return; } cur.push(n); if (cur.length === taille) { out.push(cur); cur = []; } }); if (cur.length) out.push(cur); return out;
+  }
+  function vConcours() {
+    var ids = Object.keys(st.conc).sort(function (a, b) { return st.conc[b].date - st.conc[a].date; }), h = entete('Concours', HORS && DIRECT_ON ? 'direct' : 'accueil');
+    if (st.clubOk) h += '<button class="primary" data-act="cnew">Nouveau concours</button>';
+    if (!ids.length) return h + '<p class="muted">Aucun concours pour le moment.' + (st.clubOk ? '' : ' Les concours sont créés depuis l\'espace administrateur.') + '</p>';
+    h += '<div class="card">' + ids.map(function (id) { var c = st.conc[id]; return '<div class="item clic" role="button" tabindex="0" data-act="copen" data-id="' + id + '"><span><b>' + esc(c.nom) + '</b><br><span class="small muted">' + c.disc + ' · ' + c.plateaux + ' plateaux · ' + fdate(c.date).slice(0, 10) + ' · ' + (c.planches || []).reduce(function (p, q) { return p + q.length; }, 0) + ' inscrits' + (c.clos ? ' · terminé' : '') + '</span></span><span class="muted">›</span></div>'; }).join('') + '</div>';
+    return h;
+  }
+  function vConc() {
+    var e = st.cedit, h;
+    if (e) {
+      h = entete(e.id ? 'Modifier le concours' : 'Nouveau concours', 'concours') + '<div class="card"><label class="champ" for="c_nom">Nom du concours<input type="text" id="c_nom" autocomplete="off" value="' + esc(e.nom) + '"></label>';
+      h += '<div class="row"><button style="flex:1"' + (e.disc === 'DTL' ? ' class="primary"' : '') + ' data-act="cdisc" data-d="DTL">DTL</button><button style="flex:1"' + (e.disc === 'FU' ? ' class="primary"' : '') + ' data-act="cdisc" data-d="FU">FU</button></div>';
+      h += '<p class="small muted">Nombre de plateaux par tireur</p><div class="chips">' + [25, 50, 75, 100, 150, 200].map(function (n) { return '<button' + (e.plateaux === n ? ' class="primary"' : '') + ' data-act="cplat" data-n="' + n + '">' + n + '</button>'; }).join('') + '</div><label class="champ" for="c_plat">Autre nombre (multiple de 25)<input type="number" inputmode="numeric" id="c_plat" value="' + e.plateaux + '"></label>';
+      h += '<label class="champ" for="c_ins">Inscrits, un nom par ligne (une ligne vide sépare deux planches en composition manuelle)<textarea id="c_ins" style="min-height:220px;font:inherit">' + esc(e.txt) + '</textarea></label>';
+      var ln = licNoms(); if (ln.length) h += '<p class="small muted">Ajouter un licencié</p><div class="chips">' + ln.map(function (n) { return '<button data-act="cadd" data-n="' + esc(n) + '">' + esc(n) + '</button>'; }).join('') + '</div>';
+      h += '<div class="row"><button style="flex:1" data-act="ctirage">Tirage au sort des planches</button><button style="flex:1" data-act="cordre">Planches dans l\'ordre de la liste</button></div>';
+      if (e.planches && e.planches.length) h += '<div class="card"><h2>Composition</h2>' + e.planches.map(function (pl, i) { return '<p><b>Planche ' + (i + 1) + '</b> : ' + esc(pl.join(', ')) + '</p>'; }).join('') + '</div>';
+      return h + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '') + '<button class="primary" data-act="csave">Enregistrer le concours</button></div>';
+    }
+    var id = st.cid, c = st.conc[id]; if (!c) return vConcours();
+    var R = concClassement(id), mx = maxPts(c.disc);
+    h = entete(esc(c.nom), 'concours') + '<p class="muted">' + c.disc + ' · ' + c.plateaux + ' plateaux (' + R.N + ' série' + (R.N > 1 ? 's' : '') + ') · ' + fdate(c.date).slice(0, 10) + (c.clos ? ' · terminé' : '') + '</p>';
+    h += '<div class="card"><h2>Classement</h2>' + (R.a.length ? R.a.map(function (o) { return '<div class="rank' + (o.rang === 1 && o.n ? ' first' : '') + '"><span class="rg">' + o.rang + '</span><span><b>' + esc(o.nom) + '</b><br><span class="small muted">' + (function () { var t = []; for (var i = 0; i < R.N; i++) t.push(o.s[i] === undefined ? '–' : o.s[i]); return t.join(' · '); })() + (o.bar !== null ? ' · barrage ' + o.bar : '') + (o.exq && o.n ? ' · ex æquo' + (o.n === R.N ? ', barrage à tirer' : '') : '') + '</span>' + (st.clubOk && o.exq && o.n === R.N ? '<br><input type="number" inputmode="numeric" id="bar_' + o.k + '" placeholder="Score du barrage" value="' + (o.bar === null ? '' : o.bar) + '" style="max-width:170px">' : '') + '</span><span class="sc">' + o.tot + '<small>/' + (R.N * mx) + '</small></span></div>'; }).join('') : '<p class="muted">Aucun inscrit.</p>') + (st.clubOk && R.a.some(function (o) { return o.exq && o.n === R.N; }) ? '<button data-act="cbar">Enregistrer les barrages</button>' : '') + '</div>';
+    for (var m = 1; m <= R.N; m++) {
+      h += '<div class="card"><h2>Série ' + m + ' sur ' + R.N + '</h2>';
+      (c.planches || []).forEach(function (pl, g) { var et = concEtat(id, m, g + 1);
+        h += '<div class="item col"><span><b>Planche ' + (g + 1) + '</b> · ' + esc(pl.map(nomCourt).join(', ')) + '<br><span class="small muted">' + (et.fait ? 'Terminée' : et.cours ? 'En cours ou préparée (' + nomPas(et.cours.disc, et.cours.pas) + ')' : 'À tirer') + '</span></span><span class="row">' +
+          (et.fait ? '<button data-act="voir" data-id="' + et.id + '">Voir la feuille</button>' : et.cours ? '<button data-act="nouv" data-d="' + c.disc + '" data-p="' + (et.cours.pas || '') + '">Aller au pas de tir</button>' : c.clos ? '' : (c.disc === 'FU' ? ['B'] : ['A', 'C']).map(function (l) { return '<button data-act="cnoter" data-m="' + m + '" data-g="' + (g + 1) + '" data-p="' + l + '">Noter au ' + STAND[l] + '</button>'; }).join('')) + '</span></div>'; });
+      h += '</div>';
+    }
+    h += '<button data-act="imprimer">Imprimer le palmarès</button>';
+    if (st.clubOk) h += '<div class="row"><button style="flex:1" data-act="cedit">Modifier</button><button style="flex:1" data-act="cclos">' + (c.clos ? 'Rouvrir le concours' : 'Clôturer le concours') + '</button></div>' + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '');
+    return h;
+  }
+  function concDoc(c, plus) { var d = { nom: c.nom, disc: c.disc, plateaux: c.plateaux, date: c.date, planches: (c.planches || []).map(function (p) { return { t: p }; }), clos: !!c.clos }; if (c.barrage) d.barrage = c.barrage; return Object.assign(d, plus || {}); }
+  function concLocal(d) { return Object.assign({}, d, { planches: (d.planches || []).map(function (p) { return p && p.t ? p.t : p; }) }); }
+  function concEnvoi(id, doc, apres) { fetch(FB + 'concours/' + encodeURIComponent(id), { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc(doc).mapValue.fields }) }).then(function (r) { if (!r.ok) throw 0; st.conc[id] = concLocal(doc); lset('btc.conc', st.conc); st.msg = ''; if (apres) apres(); render(); }).catch(function () { st.msg = 'Enregistrement impossible : reconnectez-vous à l\'espace administrateur ou vérifiez le réseau.'; render(); }); }
   function vMembre() {
     var h = entete('Espace membre', 'accueil');
     if (st.membre) return h + '<div class="card"><h2>' + esc(st.membre.nom) + '</h2><p class="muted">Vous êtes connecté sur ce téléphone.</p><button class="primary" data-act="tireur" data-k="' + st.membre.k + '">Mes statistiques</button><button class="ghost" data-act="membreout">Me déconnecter</button></div>';
@@ -469,7 +540,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   /* ---- planches en cours, visibles en direct au club-house ---- */
   var dirT = null, DIRECT_ON = true;
-  function vivre(s0) { var s = s0 || st.cours; if (!HORS || !DIRECT_ON || !s) return; fetch(FB + 'direct/' + encodeURIComponent(s.id), { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc({ disc: s.disc, pas: s.pas || '', date: s.date, maj: Date.now(), tel: ME, num: s.num || '', no: s.no || 0, tireurs: s.tireurs, tirs: s.tirs }).mapValue.fields }) }).catch(function () {}); }
+  function vivre(s0) { var s = s0 || st.cours; if (!HORS || !DIRECT_ON || !s) return; fetch(FB + 'direct/' + encodeURIComponent(s.id), { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc({ disc: s.disc, pas: s.pas || '', date: s.date, maj: Date.now(), tel: ME, num: s.num || '', no: s.no || 0, concours: s.concours || '', manche: s.manche || 0, groupe: s.groupe || 0, tireurs: s.tireurs, tirs: s.tirs }).mapValue.fields }) }).catch(function () {}); }
   function mort(id) { if (!HORS || !DIRECT_ON || !id) return; fetch(FB + 'direct/' + encodeURIComponent(id), { method: 'DELETE' }).catch(function () {}); }
   function fbDirect() { if (!HORS || !DIRECT_ON) return; fbListe('direct', '', {}).then(function (d) { var av = Object.keys(st.direct || {}).join(); st.direct = d; var parti = false, ailleurs = function (c) { return c && d[c.id] && d[c.id].tel && d[c.id].tel !== ME && !(c.pris > Date.now() - 20000); };
     Object.keys(st.pauses).forEach(function (id) { if (ailleurs(st.pauses[id])) { delete st.pauses[id]; parti = true; } }); if (ailleurs(st.cours)) { st.cours = null; parti = true; if (st.ecran === 'tir') st.ecran = 'accueil'; } if (parti) saveLocal();
@@ -490,7 +561,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (st.ecran !== 'tir' && st.ecran !== 'planche' && st.ecran !== 'club') render();
   }
   function corpsLic(l) { var o = {}; ['nom', 'prenom', 'nomf', 'licence', 'categorie', 'tel', 'mail', 'notes'].forEach(function (k) { if (l[k]) o[k] = l[k]; }); return o; }
-  function corpsSes(s) { var o = { disc: s.disc, date: s.date, tireurs: s.tireurs, tirs: s.tirs, termine: true }; if (s.num) { o.pas = s.pas || ''; o.num = s.num; o.no = s.no || 0; } if (s.meteo) o.meteo = s.meteo; if (s.fin) o.fin = s.fin; return o; }
+  function corpsSes(s) { var o = { disc: s.disc, date: s.date, tireurs: s.tireurs, tirs: s.tirs, termine: true }; if (s.num) { o.pas = s.pas || ''; o.num = s.num; o.no = s.no || 0; } if (s.meteo) o.meteo = s.meteo; if (s.fin) o.fin = s.fin; if (s.concours) { o.concours = s.concours; o.manche = s.manche; o.groupe = s.groupe; } return o; }
   function meteoFeuille(s) { var m = s && s.meteo; if (!m) return ''; return 'Météo : ' + m.t + ' °C, ' + (MET[m.code] || '').toLowerCase() + ', vent ' + m.vent + ' km/h ' + ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'][Math.round((m.dir || 0) / 45) % 8]; }
   var STAND = { A: 'DTL 1', B: 'FU 2', C: 'DTL 3' }; // noms des pas de tir du club
   function nomPas(disc, pas) { return STAND[pas] || disc; }
@@ -498,7 +569,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function numTxt(s) { return s && s.num ? 'Planche ' + numAff(s.num) + (s.no ? ' · n° ' + ('000' + s.no).slice(-4) : '') : ''; }
   function brancher() {
     if (HORS) {
-      sync = 'attente'; render(); fbSync(true); fbDirect(); chargerMeteo(); setInterval(function () { if (!document.hidden) chargerMeteo(); }, 15 * 60000); reglages(); rafraichir(); setInterval(rafraichir, 40 * 60000); setInterval(function () { if (!document.hidden) reglages(); }, 5 * 60000);
+      sync = 'attente'; render(); fbSync(true); fbDirect(); chargerMeteo(); setInterval(function () { if (!document.hidden) chargerMeteo(); }, 15 * 60000); reglages(); fbConc(); rafraichir(); setInterval(rafraichir, 40 * 60000); setInterval(function () { if (!document.hidden) reglages(); }, 5 * 60000);
       document.addEventListener('visibilitychange', function () { if (!document.hidden) fbSync(false); });
       try { var ml = document.createElement('link'); ml.rel = 'manifest'; ml.href = 'manifest.webmanifest'; document.head.appendChild(ml);
         var ic = document.createElement('link'); ic.rel = 'apple-touch-icon'; ic.href = 'icon-192.png'; document.head.appendChild(ic);
@@ -529,6 +600,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     }
     if (!tireurs.length) { st.msg = 'Inscrivez au moins un tireur.'; return render(); }
     var nv = { id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), disc: p.disc, pas: p.pas || '', date: Date.now(), tireurs: tireurs, tirs: [], ack: 0 };
+    if (p.conc) { nv.concours = p.conc.id; nv.manche = p.conc.m; nv.groupe = p.conc.g; }
     var J0 = new Date(); J0.setHours(0, 0, 0, 0); var tj = J0.getTime(), ta = new Date(J0.getFullYear(), 0, 1).getTime(), pre = nv.pas || nv.disc, seq = 0, nAn = 0, mxNo = 0, vus = {};
     [st.ses, st.pauses, st.direct || {}, st.cours ? { c: st.cours } : {}].forEach(function (o) { Object.keys(o).forEach(function (k) { var c = o[k], id = c.id || k; if (!c || vus[id] || !(c.date >= ta)) return; vus[id] = 1; nAn++; if (c.no > mxNo) mxNo = c.no; if (c.date >= tj && (c.pas || c.disc) === pre) { var m = /-(\d+)$/.exec(c.num || ''); seq = Math.max(seq + (m ? 0 : 1), m ? +m[1] : 0); } }); });
     nv.num = pre + '-' + ('0' + (seq + 1)).slice(-2); nv.no = Math.max(mxNo, nAn) + 1; // n° du jour par pas de tir, et n° de l'année
@@ -546,7 +618,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function flash(r, disc) { try { var f = document.createElement('div'); f.className = 'flash f' + r; f.textContent = disc === 'DTL' ? (r === 1 ? '3' : r === 2 ? '2' : '0') : (r ? '1' : '0'); document.body.appendChild(f); setTimeout(function () { f.remove(); }, 540); } catch (e) {} }
   function terminer() {
     var s = st.cours; s.termine = true; s.fin = Date.now(); if (st.meteo) s.meteo = { t: st.meteo.t, code: st.meteo.code, vent: st.meteo.vent, dir: Math.round(st.meteo.dir) }; st.ses[s.id] = s; st.cours = null; saveLocal(); mort(s.id);
-    pousser('sessions', s.id, corpsSes(s)); st.vue = s.id; st.edit = false; st.copie = ''; st.ecran = 'resultat'; render();
+    pousser('sessions', s.id, corpsSes(s)); st.vue = s.id; st.edit = false; st.copie = ''; st.retour = s.concours ? 'conc' : 'accueil'; if (s.concours) { st.cid = s.concours; st.cedit = null; } st.ecran = 'resultat'; render();
   }
   function resume(s) {
     var c = classement(s), L = [CLUB + ' - ' + s.disc + ' - ' + fdate(s.date), ''];
@@ -635,7 +707,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       '<rect x="222" y="194" width="30" height="10" rx="2" fill="#06140e"/>' +
       '<g transform="translate(318 64) rotate(-16)"><g class="' + (heroAnim ? 'vol' : '') + '"><ellipse cx="0" cy="7" rx="44" ry="13" fill="#9c3306"/><ellipse cx="0" cy="0" rx="44" ry="13" fill="#ff6a1f"/><ellipse cx="0" cy="-3" rx="27" ry="7.5" fill="#ff8a4a"/><ellipse cx="0" cy="-5" rx="12" ry="3.2" fill="#ffc09a"/></g></g>' +
       '<g class="' + (heroAnim ? 'eclat' : '') + '" fill="#ffa24a"><path d="M262 120l13-5-3 12z"/><path d="M284 142l9 2-6 7z" opacity=".8"/><path d="M246 144l6-8 5 9z" opacity=".6"/></g>' +
-      '</svg>' + p + '<button class="pin" data-pin="0" data-act="nouv" data-d="DTL" data-p="A">DTL 1</button><button class="pin bas" data-pin="1" data-act="nouv" data-d="FU" data-p="B">FU 2</button><button class="pin" data-pin="2" data-act="nouv" data-d="DTL" data-p="C">DTL 3</button><button class="pin bas clair" data-pin="3" data-act="aller" data-e="' + (HORS && DIRECT_ON ? 'direct' : 'general') + '">Scores<small>club-house</small></button><span class="wm">BTC<em>GAS</em></span><span class="meteo">' + meteoHtml() + '</span>' + compteurHtml() + '<span class="sub">Feuille de marque DTL · FU</span></div>'; heroAnim = false;
+      '</svg>' + p + '<button class="pin" data-pin="0" data-act="nouv" data-d="DTL" data-p="A">DTL 1</button><button class="pin bas" data-pin="1" data-act="nouv" data-d="FU" data-p="B">FU 2</button><button class="pin" data-pin="2" data-act="nouv" data-d="DTL" data-p="C">DTL 3</button><button class="pin bas clair" data-pin="3" data-act="aller" data-e="' + (HORS && DIRECT_ON ? 'direct' : 'general') + '">Scores<small>club-house</small></button>' + (st.clubOk ? '<button class="pin bas clair" data-pin="4" data-act="aller" data-e="club">Gestion<small>suivi interne</small></button>' : '') + '<span class="wm">BTC<em>GAS</em></span><span class="meteo">' + meteoHtml() + '</span>' + compteurHtml() + '<span class="sub">Feuille de marque DTL · FU</span></div>'; heroAnim = false;
     h += '<div class="stack"><div class="disc">' +
       '<button data-act="nouv" data-d="DTL"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M60 14L22 2"/><path d="M60 14V0"/><path d="M60 14L98 2"/></g><rect x="52" y="12" width="16" height="7" rx="2" fill="#ff6a1f"/><g fill="currentColor"><circle cx="16" cy="40" r="5"/><circle cx="38" cy="47" r="5"/><circle cx="60" cy="50" r="5"/><circle cx="82" cy="47" r="5"/><circle cx="104" cy="40" r="5"/></g></svg><b>DTL</b><span>5 tireurs, 5 plateaux par poste<br>3 pts / 2 pts / 0</span></button>' +
       '<button data-act="nouv" data-d="FU"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M16 14L4 0"/><path d="M38 14L46 0"/><path d="M60 14V0"/><path d="M82 14L72 0"/><path d="M104 14L116 0"/></g><g fill="#ff6a1f"><rect x="10" y="12" width="12" height="7" rx="2"/><rect x="32" y="12" width="12" height="7" rx="2"/><rect x="54" y="12" width="12" height="7" rx="2"/><rect x="76" y="12" width="12" height="7" rx="2"/><rect x="98" y="12" width="12" height="7" rx="2"/></g><g fill="currentColor"><circle cx="16" cy="48" r="5"/><circle cx="38" cy="48" r="5"/><circle cx="60" cy="48" r="5"/><circle cx="82" cy="48" r="5"/><circle cx="104" cy="48" r="5"/></g></svg><b>FU</b><span>Fosse universelle, 6 tireurs<br>1 pt par plateau cassé</span></button></div></div>';
@@ -804,6 +876,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (vide) h += '<div class="card"><h2>Classement ' + PT[st.dper] + '</h2><p class="muted">Aucune série enregistrée sur cette période.</p></div>';
     var der = tous.filter(function (s) { return s.date >= t0[st.dper]; }).sort(function (p, q) { return q.date - p.date; }).slice(0, 5);
     if (der.length) h += '<div class="card"><h2>Dernières feuilles ' + PT[st.dper] + '</h2>' + der.map(function (s) { var c = classement(s)[0]; return '<div class="item clic" role="button" tabindex="0" data-act="voir" data-id="' + s.id + '"><span><b>' + s.disc + '</b> · ' + fdate(s.date) + (s.num ? ' · ' + numAff(s.num) : '') + '<br><span class="small muted">' + s.tireurs.length + ' tireur(s) · 1er : ' + esc(c.nom) + ' ' + c.total + '/' + maxPts(s.disc) + '</span></span><span class="muted">›</span></div>'; }).join('') + '</div>';
+    h += '<button data-act="aller" data-e="concours">Concours</button>';
     h += '<div class="row"><button style="flex:1" data-act="aller" data-e="general">Tous les classements</button><button style="flex:1" data-act="aller" data-e="historique">Toutes les feuilles</button></div>';
     h += '<p class="small muted">Moyenne par série de 25 plateaux. Touchez un résultat pour ouvrir la feuille (pour un tireur : sa meilleure série de la période). La période change toute seule toutes les 12 secondes.</p></div></div>';
     return h;
@@ -834,7 +907,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   var CH = [['prenom', 'Prénom', 'text'], ['nomf', 'Nom', 'text'], ['licence', 'N° de licence', 'text'], ['categorie', 'Catégorie', 'text'], ['tel', 'Téléphone', 'tel'], ['mail', 'E-mail', 'email']];
   function vClub() {
-    var h = entete('Administrateur', 'accueil');
+    var h = entete(st.clubOk ? 'Gestion du club' : 'Administrateur', 'accueil');
     if (!st.clubOk) return h + '<div class="card"><h2>Accès réservé à l\'administrateur</h2><input type="password" id="cpass" inputmode="numeric" autocomplete="off" placeholder="Mot de passe"><button class="primary" data-act="clubin">Entrer</button>' + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '') + '</div>';
     if (st.fiche !== null) {
       var l = st.lic[st.fiche] || {}, anc = !l.prenom && !l.nomf && l.nom ? l.nom : '';
@@ -847,9 +920,12 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     }
     var ids = Object.keys(st.lic).sort(function (a, b) { return st.lic[a].nom.localeCompare(st.lic[b].nom, 'fr'); });
     if (HORS) h += '<div class="card"><h2>Lanceurs</h2><p class="small muted">Plateaux lancés à chaque pas de tir depuis le dernier rechargement. Indiquez la capacité pour être prévenu quand il faut recharger.</p>' + ['A', 'B', 'C'].map(function (l) { var o = st.lanceurs[l] || {}, n = lancCompte(l); return '<div class="item col"><span><b>' + STAND[l] + '</b> · ' + n + ' plateaux lancés' + (o.depuis ? ' depuis le ' + fdate(o.depuis) : '') + (o.cap ? ' · reste environ ' + Math.max(0, o.cap - n) + ' sur ' + o.cap : '') + '</span><span class="row"><input type="number" inputmode="numeric" id="lc_' + l + '" placeholder="Capacité" value="' + (o.cap || '') + '" style="flex:1;min-width:90px"><button data-act="lancre" data-p="' + l + '">Rechargé</button></span></div>'; }).join('') + '<button data-act="lancsave">Enregistrer les capacités</button></div>';
-    if (HORS) h += '<div class="card"><h2>Code du club</h2><p class="small muted">' + (MEMBRES ? 'Un code du club est en service : il faut être connecté à l\'espace membre pour noter une planche.' : 'Aucun code défini : tout le monde peut noter avec le QR code. Définir un code réserve la notation aux membres connectés.') + '</p>' + (MEMBRES ? '<input type="password" id="ccold" autocomplete="off" placeholder="Code actuel du club">' : '') + '<input type="password" id="ccnew" autocomplete="off" placeholder="' + (MEMBRES ? 'Nouveau code du club' : 'Code du club (4 caractères minimum)') + '"><button data-act="codeclub">' + (MEMBRES ? 'Changer le code du club' : 'Définir le code du club') + '</button></div>' +
+    var cc = st.cc || {}, pr = cc.per || 'jamais';
+    if (HORS) h += '<div class="card"><h2>Code du club</h2>' + (cc.code ? '<p>Code actuel : <b style="font-size:26px;letter-spacing:3px">' + esc(cc.code) + '</b><br><span class="small muted">défini le ' + fdate(cc.maj) + '</span></p>' : '<p class="small muted">' + (MEMBRES ? 'Un code est en service mais il n\'est pas enregistré ici : saisissez le code actuel et un nouveau code.' : 'Aucun code défini : tout le monde peut noter avec le QR code. Définir un code réserve la notation aux membres connectés.') + '</p>') +
+      '<p class="small muted">Renouvellement automatique du code</p><div class="chips">' + [['jamais', 'Jamais'], ['jour', 'Chaque jour'], ['semaine', 'Chaque semaine']].map(function (x) { return '<button' + (pr === x[0] ? ' class="primary"' : '') + ' data-act="codeper" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div><p class="small muted">Le nouveau code est tiré au sort quand vous ouvrez cet espace pour la première fois du jour ou de la semaine. Les membres doivent alors se reconnecter avec le nouveau code.</p>' +
+      (MEMBRES && !cc.code ? '<input type="password" id="ccold" autocomplete="off" placeholder="Code actuel du club">' : '') + '<input type="text" id="ccnew" autocomplete="off" placeholder="Choisir un code (4 caractères minimum)"><div class="row"><button style="flex:1" data-act="codeclub">Enregistrer ce code</button>' + (cc.code ? '<button style="flex:1" data-act="codegen">Tirer un nouveau code</button>' : '') + '</div></div>' +
       '<div class="card"><h2>Mot de passe administrateur</h2><input type="password" id="apnew" autocomplete="off" placeholder="Nouveau mot de passe (6 caractères minimum)"><button data-act="adminpass">Changer le mot de passe</button></div>' + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '');
-    h += '<button class="ghost" data-act="resync">Tout resynchroniser sur ce téléphone</button><p class="small muted">Mode administrateur actif : correction d\'un tir et suppression d\'une feuille depuis « Gérer les feuilles ».</p><div class="row"><button style="flex:1" data-act="aller" data-e="historique">Gérer les feuilles</button><button style="flex:1" data-act="clublock">Verrouiller</button></div>';
+    h += '<button data-act="aller" data-e="concours">Concours</button><button class="ghost" data-act="resync">Tout resynchroniser sur ce téléphone</button><p class="small muted">Mode administrateur actif : correction d\'un tir et suppression d\'une feuille depuis « Gérer les feuilles ».</p><div class="row"><button style="flex:1" data-act="aller" data-e="historique">Gérer les feuilles</button><button style="flex:1" data-act="clublock">Verrouiller</button></div>';
     h += '<div class="card"><h2>Récupérer les feuilles (' + Object.keys(st.ses).length + ')</h2><p class="small muted">Fichiers lisibles dans Excel. La sauvegarde complète contient toutes les feuilles tir par tir.</p>' + ((dl || HORS) ? '<button data-act="xtout">Toutes les feuilles (CSV)</button><button data-act="xgen">Classement général (CSV)</button><button data-act="xjson">Sauvegarde complète (JSON)</button>' : '<p class="err">Téléchargement indisponible dans cette vue.</p>') + '</div>';
     h += '<button class="primary" data-act="fnew">Ajouter un licencié</button>';
     if (!ids.length) return h + '<p class="muted">Aucun licencié pour le moment.</p>';
@@ -865,7 +941,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) veille(); });
   function render() {
-    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral, direct: vDirect, pas: vPas, tireur: vTireur, membre: vMembre }[st.ecran] || vAccueil;
+    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral, direct: vDirect, pas: vPas, tireur: vTireur, membre: vMembre, concours: vConcours, conc: vConc }[st.ecran] || vAccueil;
     app.innerHTML = v(); app.classList.toggle('large', st.ecran === 'direct'); veille();
     if (st.ecran !== ecranVu) { ecranVu = st.ecran; app.classList.remove('in'); void app.offsetWidth; app.classList.add('in'); }
     hero3d(); syn3d();
@@ -990,7 +1066,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       fr.forEach(function (q) { q.visible = ec >= 0 && ec < 0.8; if (q.visible) { var w = q.userData.v, bx = p.t[0] + p.d[0] * 45, bz = p.t[1] + p.d[1] * 45; q.position.set(bx + w.x * ec, 13.95 + w.y * ec - 12 * ec * ec, bz + w.z * ec); q.rotation.set(ec * 8, ec * 6, 0); } });
       tomber(t); r.render(sc, cam); if (++nbImg === 4) r.shadowMap.autoUpdate = false;
       if (photo && cv.parentNode && !cv.parentNode.querySelector('.ign')) { var cr = document.createElement('span'); cr.className = 'ign'; cr.textContent = 'Photo aérienne © IGN · Météo Open-Meteo'; cv.parentNode.appendChild(cr); }
-      if (pins) pins.forEach(function (el) { var k = +el.dataset.pin, b = k < 3 ? PAS[k].b : CH; pv.set(b[0], 5.5, b[1]).project(cam); el.style.left = ((pv.x * 0.5 + 0.5) * W) + 'px'; el.style.top = ((-pv.y * 0.5 + 0.5) * H) + 'px'; el.style.visibility = 'visible'; });
+      if (pins) pins.forEach(function (el) { var k = +el.dataset.pin, b = k < 3 ? PAS[k].b : k === 4 ? [-27.1, 0.8] : CH; pv.set(b[0], 5.5, b[1]).project(cam); el.style.left = ((pv.x * 0.5 + 0.5) * W) + 'px'; el.style.top = ((-pv.y * 0.5 + 0.5) * H) + 'px'; el.style.visibility = 'visible'; });
     }
     // version hébergée : vraie photo aérienne IGN (licence ouverte) drapée sur le terrain, arbres posés là où la photo montre des bois
     if (HORS) (function () {
@@ -1194,12 +1270,33 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     var a = b.dataset.act, s;
     if (a !== 'suppr' && a !== 'dellic' && a !== 'fdel' && a !== 'sesdel' && a !== 'seldel') st.suppr = null;
     if (a === 'aller' && b.dataset.e !== 'membre') st.apres = null;
-    if (a === 'aller') { if (b.dataset.e === 'direct') dirGo(); if (b.dataset.e === 'accueil') fbDirect(); if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; }
+    if (a === 'aller') { if (b.dataset.e === 'concours') { fbConc(); st.cedit = null; } if (b.dataset.e === 'direct') dirGo(); if (b.dataset.e === 'accueil') fbDirect(); if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; }
     else if (a === 'lancre' || a === 'lancsave') {
       ['A', 'B', 'C'].forEach(function (l) { var el = document.getElementById('lc_' + l), v = el ? parseInt(el.value, 10) : 0, o = st.lanceurs[l] || (st.lanceurs[l] = {}); if (v > 0) o.cap = v; else delete o.cap; });
       if (a === 'lancre') st.lanceurs[b.dataset.p].depuis = Date.now();
       b.disabled = true; lancSauve().then(function (r) { st.msg = r.ok ? 'Lanceurs enregistrés.' : 'Enregistrement impossible : reconnectez-vous à l\'espace administrateur.'; render(); }, function () { st.msg = 'Pas de réseau : enregistrement impossible.'; render(); }); return;
     }
+    else if (a === 'copen') { st.cid = b.dataset.id; st.cedit = null; st.msg = ''; st.ecran = 'conc'; window.scrollTo(0, 0); }
+    else if (a === 'cnew') { st.cedit = { id: '', nom: '', disc: 'DTL', plateaux: 100, txt: '', planches: [] }; st.msg = ''; st.ecran = 'conc'; }
+    else if (a === 'cedit') { var ce = st.conc[st.cid]; st.cedit = { id: st.cid, nom: ce.nom, disc: ce.disc, plateaux: ce.plateaux, txt: (ce.planches || []).map(function (p) { return p.join('\n'); }).join('\n\n'), planches: ce.planches || [], date: ce.date, barrage: ce.barrage, clos: ce.clos }; st.msg = ''; }
+    else if (a === 'cdisc' || a === 'cplat' || a === 'cadd' || a === 'ctirage' || a === 'cordre' || a === 'csave') {
+      var E = st.cedit, gv = function (i) { var el = document.getElementById(i); return el ? el.value : ''; }; if (!E) return;
+      E.nom = gv('c_nom').trim(); E.txt = gv('c_ins'); var pn = parseInt(gv('c_plat'), 10); if (pn > 0) E.plateaux = pn;
+      if (a === 'cdisc') E.disc = b.dataset.d; else if (a === 'cplat') E.plateaux = +b.dataset.n; else if (a === 'cadd') { if (E.txt.split('\n').map(function (x) { return slug(x); }).indexOf(slug(b.dataset.n)) < 0) E.txt = (E.txt.replace(/\s+$/, '') + '\n' + b.dataset.n).replace(/^\n/, ''); }
+      var lignes = E.txt.split('\n').map(function (x) { return x.trim().replace(/\s+/g, ' '); });
+      if (a === 'ctirage') E.planches = composer(lignes, MAXT[E.disc], true); else if (a === 'cordre') E.planches = composer(lignes, MAXT[E.disc], false);
+      if (a === 'ctirage' || a === 'cordre') E.txt = E.planches.map(function (p) { return p.join('\n'); }).join('\n\n');
+      if (a === 'csave') {
+        if (!E.planches.length) E.planches = composer(lignes, MAXT[E.disc], false);
+        var tous = [].concat.apply([], E.planches).map(slug), dbl = tous.filter(function (x, i) { return tous.indexOf(x) !== i; });
+        if (!E.nom) st.msg = 'Donnez un nom au concours.'; else if (E.plateaux % NB) st.msg = 'Le nombre de plateaux doit être un multiple de 25.'; else if (!tous.length) st.msg = 'Inscrivez au moins un tireur.'; else if (dbl.length) st.msg = 'Un tireur est inscrit deux fois.';
+        else { var cid = E.id || 'c' + Date.now().toString(36), doc = { nom: E.nom, disc: E.disc, plateaux: E.plateaux, date: E.date || Date.now(), planches: E.planches.map(function (p) { return { t: p }; }), clos: !!E.clos }; if (E.barrage) doc.barrage = E.barrage;
+          b.disabled = true; concEnvoi(cid, doc, function () { st.cid = cid; st.cedit = null; }); return; }
+      }
+    }
+    else if (a === 'cclos') { var cc = st.conc[st.cid]; b.disabled = true; concEnvoi(st.cid, concDoc(cc, { clos: !cc.clos })); return; }
+    else if (a === 'cbar') { var cb = st.conc[st.cid], br = Object.assign({}, cb.barrage || {}); concClassement(st.cid).a.forEach(function (o) { var el = document.getElementById('bar_' + o.k); if (el && el.value !== '') br[o.k] = parseInt(el.value, 10) || 0; }); b.disabled = true; concEnvoi(st.cid, concDoc(cb, { barrage: br })); return; }
+    else if (a === 'cnoter') { var cn2 = st.conc[st.cid], gi = +b.dataset.g; if (HORS && MEMBRES && !st.membre && !st.clubOk) { st.msg = ''; st.ecran = 'membre'; } else { nouvellePlanche(cn2.disc, cn2.planches[gi - 1], b.dataset.p); st.planche.conc = { id: st.cid, m: +b.dataset.m, g: gi }; } }
     else if (a === 'membreout') { st.membre = null; jetonM = null; lset('btc.membre', null); }
     else if (a === 'membrein') {
       var mc = (document.getElementById('mcode') || {}).value || '', mn = ((document.getElementById('mnom') || {}).value || '').trim().replace(/\s+/g, ' '), mk = slug(mn);
@@ -1211,15 +1308,11 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
           var ap = st.apres; st.apres = null; if (ap) ouvrirPas(ap.disc, ap.pas); else { st.ecran = 'membre'; render(); }
         }, function () { st.msg = 'Connexion impossible.'; render(); }); return; }
     }
-    else if (a === 'codeclub') {
-      var cn = (document.getElementById('ccnew') || {}).value || '', co = (document.getElementById('ccold') || {}).value || '';
-      if (cn.length < 4) st.msg = 'Le code du club doit faire au moins 4 caractères.';
-      else { b.disabled = true; b.textContent = 'Enregistrement…';
-        (MEMBRES ? fbAuth('signInWithPassword', co, MEMBRE_MAIL).then(function (r) { if (!r.ok) throw 'Code actuel incorrect.'; return fbMaj(r.j.idToken, cn).then(function (u) { if (!u.ok) throw 'Le code n\'a pas pu être changé.'; }); })
-          : fbAuth('signUp', cn, MEMBRE_MAIL).then(function (r) { if (r.ok) return; return fbAuth('signInWithPassword', cn, MEMBRE_MAIL).then(function (r2) { if (!r2.ok) throw 'Un code du club existe déjà : saisissez-le pour le confirmer.'; }); }))
-          .then(function () { return fetch(FB + 'reglages/club', { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc({ membres: true, maj: Date.now() }).mapValue.fields }) }); })
-          .then(function (r) { if (!r.ok) throw 'Le réglage n\'a pas pu être enregistré.'; MEMBRES = true; lset('btc.mOn', true); st.msg = 'Code du club enregistré. Les membres doivent maintenant se connecter pour noter.'; render(); })
-          .catch(function (e) { st.msg = typeof e === 'string' ? e : 'Enregistrement impossible.'; render(); }); return; }
+    else if (a === 'codeclub' || a === 'codegen' || a === 'codeper') {
+      var cn = (document.getElementById('ccnew') || {}).value || '', co = (document.getElementById('ccold') || {}).value || ''; if (!st.cc) st.cc = { code: '', maj: 0, per: 'jamais' };
+      if (a === 'codeper') { st.cc.per = b.dataset.v; if (!st.cc.code) { st.msg = 'Fréquence retenue : elle s\'appliquera dès qu\'un code sera enregistré.'; } else { b.disabled = true; fetch(FB + 'prive/code', { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc(st.cc).mapValue.fields }) }).then(function (r) { st.msg = r.ok ? 'Fréquence de renouvellement enregistrée.' : 'Enregistrement impossible.'; render(); }, function () { st.msg = 'Pas de réseau.'; render(); }); return; } }
+      else if (a === 'codeclub' && cn.length < 4) st.msg = 'Le code du club doit faire au moins 4 caractères.';
+      else { b.disabled = true; b.textContent = 'Enregistrement…'; (a === 'codegen' ? codeAuto() : codeChange(cn, st.cc.per, co).then(function () { st.msg = 'Code du club enregistré : ' + cn; })).then(render, function (e) { st.msg = typeof e === 'string' ? e : 'Enregistrement impossible.'; render(); }); return; }
     }
     else if (a === 'adminpass') {
       var np = (document.getElementById('apnew') || {}).value || '';
@@ -1237,7 +1330,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'selenv') { envoyerSel(); return; }
     else if (a === 'sesdelOk') { var sid = st.vue; delete st.ses[sid]; saveLocal(); retirer('sessions', sid); signalSync(); st.edit = false; st.ecran = 'historique'; }
     else if (a === 'clubin') { var cp = document.getElementById('cpass'), code = cp ? cp.value : '';
-      if (HORS) { if (!code) return; b.disabled = true; b.textContent = 'Connexion…'; fbLogin(code).then(function (tk) { jeton = tk; st.clubOk = true; st.msg = ''; render(); fbFiches(); }, function () { st.msg = navigator.onLine === false ? 'Pas de réseau : connexion impossible.' : 'Mot de passe incorrect.'; render(); }); return; }
+      if (HORS) { if (!code) return; b.disabled = true; b.textContent = 'Connexion…'; fbLogin(code).then(function (tk) { jeton = tk; st.clubOk = true; st.msg = ''; render(); fbFiches(); codeCharge(); }, function () { st.msg = navigator.onLine === false ? 'Pas de réseau : connexion impossible.' : 'Mot de passe incorrect.'; render(); }); return; }
       if (code === CLUB_PASS) { st.clubOk = true; st.msg = ''; } else st.msg = 'Mot de passe incorrect.'; }
     else if (a === 'fnew') { st.fiche = ''; st.msg = ''; }
     else if (a === 'fedit') { st.fiche = b.dataset.id; st.msg = ''; }
@@ -1261,10 +1354,10 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'annuler') { s = st.cours; if (s && s.tirs.length) { if (SY) SY.stop(); s.tirs.pop(); s.ack = 0; if (etat(s).rotation) s.ack = s.tirs.length; saveLocal(); vivre(); } }
     else if (a === 'pret') { st.cours.ack = st.cours.tirs.length; saveLocal(); }
     else if (a === 'abandon') { var ai = b.dataset.id || (st.cours && st.cours.id); if (ai) { mort(ai); if (st.cours && st.cours.id === ai) st.cours = null; delete st.pauses[ai]; if (st.direct) delete st.direct[ai]; saveLocal(); } }
-    else if (a === 'reprendre') { var ri = b.dataset.id, dr = st.direct && st.direct[ri], pris = dr && dr.tel && dr.tel !== ME && dr.tirs && dr.tirs.length && dr.maj > Date.now() - VERROU, rs = pris ? null : (st.cours && st.cours.id === ri) ? st.cours : st.pauses[ri] || (st.direct && st.direct[ri] ? { id: ri, disc: st.direct[ri].disc, pas: st.direct[ri].pas || '', date: st.direct[ri].date, tireurs: st.direct[ri].tireurs, tirs: st.direct[ri].tirs.slice(), ack: st.direct[ri].tirs.length, num: st.direct[ri].num || '', no: st.direct[ri].no || 0 } : null);
+    else if (a === 'reprendre') { var ri = b.dataset.id, dr = st.direct && st.direct[ri], pris = dr && dr.tel && dr.tel !== ME && dr.tirs && dr.tirs.length && dr.maj > Date.now() - VERROU, rs = pris ? null : (st.cours && st.cours.id === ri) ? st.cours : st.pauses[ri] || (st.direct && st.direct[ri] ? { id: ri, disc: st.direct[ri].disc, pas: st.direct[ri].pas || '', date: st.direct[ri].date, tireurs: st.direct[ri].tireurs, tirs: st.direct[ri].tirs.slice(), ack: st.direct[ri].tirs.length, num: st.direct[ri].num || '', no: st.direct[ri].no || 0, concours: st.direct[ri].concours || '', manche: st.direct[ri].manche || 0, groupe: st.direct[ri].groupe || 0 } : null);
       if (rs) { if (st.cours && st.cours.id !== ri) st.pauses[st.cours.id] = st.cours; delete st.pauses[ri]; st.cours = rs; rs.pris = Date.now(); if (rs.ack === undefined) rs.ack = 0; saveLocal(); vivre(); st.ecran = 'tir'; window.scrollTo(0, 0); } }
     else if (0) {}
-    else if (a === 'voir') { st.retour = st.ecran === 'direct' ? 'direct' : st.ecran === 'historique' ? 'historique' : st.ecran === 'tireur' ? 'tireur' : 'accueil'; st.vue = b.dataset.id; st.copie = ''; st.msg = ''; st.ecran = 'resultat'; }
+    else if (a === 'voir') { st.retour = st.ecran === 'conc' ? 'conc' : st.ecran === 'direct' ? 'direct' : st.ecran === 'historique' ? 'historique' : st.ecran === 'tireur' ? 'tireur' : 'accueil'; st.vue = b.dataset.id; st.copie = ''; st.msg = ''; st.ecran = 'resultat'; }
     else if (a === 'suppr' || a === 'dellic') st.suppr = b.dataset.id;
         else if (a === 'dellicOk') { delete st.lic[b.dataset.id]; saveLocal(); retirer('licencies', b.dataset.id); }
     else if (a === 'addlic') { var n = document.getElementById('newlic'); ajouterLic(n.value); }
