@@ -351,7 +351,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   /* ---- stockage local (confort, peut manquer) ---- */
   function lget(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
   function lset(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-  st.lic = lget('btc.lic', {}); st.ses = lget('btc.ses', {}); st.cours = lget('btc.cours', null); st.pauses = lget('btc.pauses', {});
+  st.lic = lget('btc.lic', {}); st.ses = lget('btc.ses', {}); Object.keys(st.ses).forEach(function (id) { var c = st.ses[id]; if (c && typeof c.tirs === 'string') c.tirs = c.tirs.split('').map(Number); }); st.cours = lget('btc.cours', null); st.pauses = lget('btc.pauses', {});
   var ME = lget('btc.tel', null); if (!ME) { ME = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); lset('btc.tel', ME); }
   var VERROU = 10 * 60000; // une planche notée sur un autre téléphone reste verrouillée tant qu'il a été actif dans les 10 dernières minutes
   st.skin = 'sombre';
@@ -359,7 +359,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   peau();
   Object.keys(st.ses).forEach(function (id) { if (ecarte(id, st.ses[id].date)) delete st.ses[id]; });
   if (st.cours && !(st.cours.date >= PURGE)) st.cours = null;
-  function saveLocal() { lset('btc.lic', st.lic); lset('btc.ses', st.ses); lset('btc.cours', st.cours); lset('btc.pauses', st.pauses || {}); }
+  function saveLocal() { var cs = {}; Object.keys(st.ses).forEach(function (id) { var c = st.ses[id]; cs[id] = Object.assign({}, c, { tirs: (c.tirs || []).join('') }); }); lset('btc.lic', st.lic); lset('btc.ses', cs); lset('btc.cours', st.cours); lset('btc.pauses', st.pauses || {}); }
 
   function slug(n) { return n.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'x'; }
   function esc(x) { return String(x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -396,7 +396,14 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       else if (a.j && a.j.error) { st.membre = null; jetonM = null; lset('btc.membre', null); if (st.ecran === 'accueil' || st.ecran === 'membre') render(); } // le code du club a changé
     }).catch(function () {});
   }
-  function reglages() { if (!HORS) return; fetch(FB + 'reglages/club').then(function (r) { if (r.status === 200 || r.status === 404) { var on = r.status === 200; if (on !== MEMBRES) { MEMBRES = on; lset('btc.mOn', on); if (st.ecran === 'accueil') render(); } } }).catch(function () {}); }
+  function reglages() { if (!HORS) return;
+    fetch(FB + 'reglages/sync').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { var m = j && j.fields && j.fields.maj ? Number(j.fields.maj.integerValue || j.fields.maj.doubleValue || 0) : 0; if (m > lget('btc.full', 0)) fbSync('tout'); }).catch(function () {});
+    fetch(FB + 'reglages/lanceurs').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (!j) return; st.lanceurs = fbDec({ mapValue: { fields: j.fields || {} } }); lset('btc.lanc', st.lanceurs); }).catch(function () {});
+    fetch(FB + 'reglages/club').then(function (r) { if (r.status === 200 || r.status === 404) { var on = r.status === 200; if (on !== MEMBRES) { MEMBRES = on; lset('btc.mOn', on); if (st.ecran === 'accueil') render(); } } }).catch(function () {}); }
+  st.lanceurs = lget('btc.lanc', {});
+  function lancCompte(l) { var d = (st.lanceurs[l] || {}).depuis || 0, n = 0, vus = {}; [st.ses, st.pauses, st.direct || {}, st.cours ? { c: st.cours } : {}].forEach(function (o) { Object.keys(o).forEach(function (k) { var c = o[k], id = (c && c.id) || k; if (!c || vus[id] || c.pas !== l || !c.tirs || !(c.date >= d)) return; vus[id] = 1; n += c.tirs.length; }); }); return n; }
+  function lancAlerte(l) { var o = st.lanceurs[l]; if (!o || !o.cap) return ''; var r = o.cap - lancCompte(l); return r <= Math.max(25, o.cap * 0.15) ? '<p class="err">Lanceur ' + STAND[l] + ' : il reste environ ' + Math.max(0, r) + ' plateaux, à recharger.</p>' : ''; }
+  function lancSauve() { lset('btc.lanc', st.lanceurs); return fetch(FB + 'reglages/lanceurs', { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc(st.lanceurs).mapValue.fields }) }); }
   function peutVoir(k) { return !HORS || st.clubOk || !!(st.membre && st.membre.k === k); }
   function vMembre() {
     var h = entete('Espace membre', 'accueil');
@@ -405,7 +412,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     return h + '<div class="card"><h2>Connexion</h2><p class="muted">' + (st.apres ? 'Il faut être connecté pour noter une planche. ' : '') + 'Saisissez le code du club, puis choisissez votre nom.</p><input type="password" id="mcode" autocomplete="off" placeholder="Code du club"><input type="text" id="mnom" list="dl-mb" autocomplete="off" placeholder="Votre nom"><datalist id="dl-mb">' + noms.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist><button class="primary" data-act="membrein">Me connecter</button>' + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '') + '</div>';
   }
   function fbFiches() { if (!jeton) return; fetch(FB + 'fiches?pageSize=300', { headers: fbTete() }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (j) { (j.documents || []).forEach(function (d) { var id = d.name.split('/').pop(), v = fbDec({ mapValue: { fields: d.fields || {} } }); st.lic[id] = Object.assign(st.lic[id] || {}, v, { _s: 1 }); }); saveLocal(); if (st.ecran === 'club' && st.fiche === null) render(); }).catch(function () {}); }
-  function fbCorps(col, x) { return col === 'licencies' ? { nom: x.nom } : corpsSes(x); }
+  function fbCorps(col, x) { return col === 'licencies' ? (x.categorie || x.cat ? { nom: x.nom, cat: String(x.categorie || x.cat).trim().slice(0, 40) } : { nom: x.nom }) : corpsSes(x); }
+  function catDe(nom) { var l = st.lic[slug(nom)]; return l ? String(l.categorie || l.cat || '').trim() : ''; }
   function fbSet(col, cle, id) {
     var x = st[cle][id]; if (!x) return Promise.resolve();
     if (col === 'licencies') { if (!jeton) return Promise.resolve(); fetch(FB + 'fiches/' + encodeURIComponent(id), { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc(corpsLic(x)).mapValue.fields }) }).catch(function () {}); }
@@ -418,27 +426,38 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       (j.documents || []).forEach(function (d) { acc[d.name.split('/').pop()] = fbDec({ mapValue: { fields: d.fields || {} } }); });
       return j.nextPageToken ? fbListe(col, j.nextPageToken, acc) : acc; });
   }
+  // lecture économe : seules les feuilles terminées ou corrigées depuis le dernier passage sont relues ;
+  // une relecture complète a lieu au premier lancement, toutes les 12 h, ou quand l'administrateur a supprimé une feuille
+  function fbNouv() {
+    var mf = 0; Object.keys(st.ses).forEach(function (id) { if (st.ses[id].fin > mf) mf = st.ses[id].fin; }); var depuis = Math.round(Math.max(lget('btc.full', 0) - 600000, mf - 300000));
+    return fetch(FB.replace(/documents\/$/, 'documents:runQuery'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'sessions' }], where: { fieldFilter: { field: { fieldPath: 'fin' }, op: 'GREATER_THAN', value: { integerValue: String(depuis) } } }, orderBy: [{ field: { fieldPath: 'fin' }, direction: 'ASCENDING' }], limit: 300 } }) })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (a) { var acc = {}; (Array.isArray(a) ? a : []).forEach(function (x) { if (x.document) acc[x.document.name.split('/').pop()] = fbDec({ mapValue: { fields: x.document.fields || {} } }); }); return acc; });
+  }
   function fbSync(force) {
-    if (!HORS || fbCours || (!force && Date.now() - fbVu < 20000)) return; fbCours = true;
-    Promise.all([fbListe('sessions', '', {}), fbListe('licencies', '', {})]).then(function (res) {
+    if (!HORS || fbCours || (!force && Date.now() - fbVu < 30000)) return; fbCours = true;
+    var dernier = lget('btc.full', 0), complet = force === 'tout' || !dernier || Date.now() - dernier > 12 * 3600000;
+    (complet ? Promise.all([fbListe('sessions', '', {}), fbListe('licencies', '', {})]) : fbNouv().then(function (d) { return [d, null]; })).then(function (res) {
       [['sessions', 'ses', res[0]], ['licencies', 'lic', res[1]]].forEach(function (t) {
-        var col = t[0], cle = t[1], dist = t[2], loc = st[cle];
+        var col = t[0], cle = t[1], dist = t[2], loc = st[cle]; if (!dist) return;
         Object.keys(dist).forEach(function (id) { if (col === 'sessions' && ecarte(id, dist[id].date)) { delete dist[id]; delete loc[id]; return; } if (loc[id] && loc[id]._d) { fbSet(col, cle, id); return; } loc[id] = Object.assign(col === 'licencies' ? (loc[id] || {}) : {}, dist[id], { _s: 1 }); if (col === 'sessions') loc[id].id = id; });
-        Object.keys(loc).forEach(function (id) { if (dist[id]) return; if (loc[id]._s && !loc[id]._d) delete loc[id]; /* déjà envoyé puis retiré par l'administrateur */ else if (col === 'sessions' || jeton) fbSet(col, cle, id); });
+        Object.keys(loc).forEach(function (id) { if (dist[id]) return; if (loc[id]._s && !loc[id]._d) { if (complet) delete loc[id]; /* déjà envoyé puis retiré par l'administrateur */ } else if (col === 'sessions' || jeton) fbSet(col, cle, id); });
       });
-      fbVu = Date.now(); fbCours = false; sync = 'ok'; saveLocal(); if (st.ecran !== 'tir' && st.ecran !== 'planche' && st.ecran !== 'club') render();
+      if (complet) lset('btc.full', Date.now());
+      fbVu = Date.now(); fbCours = false; sync = 'ok'; saveLocal(); if (st.ecran !== 'tir' && st.ecran !== 'planche' && st.ecran !== 'club' && st.ecran !== 'membre') render();
     }).catch(function () { fbCours = false; if (sync !== 'ok') { sync = 'local'; render(); } });
   }
+  function signalSync() { if (HORS && jeton) fetch(FB + 'reglages/sync', { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc({ maj: Date.now() }).mapValue.fields }) }).catch(function () {}); }
   /* ---- météo du stand de Gas : température, temps, vent (Open-Meteo) ---- */
   var MET = { 0: 'Ciel dégagé', 1: 'Peu nuageux', 2: 'Éclaircies', 3: 'Couvert', 45: 'Brouillard', 48: 'Brouillard givrant', 51: 'Bruine', 53: 'Bruine', 55: 'Bruine', 56: 'Bruine verglaçante', 57: 'Bruine verglaçante', 61: 'Pluie faible', 63: 'Pluie', 65: 'Forte pluie', 66: 'Pluie verglaçante', 67: 'Pluie verglaçante', 71: 'Neige faible', 73: 'Neige', 75: 'Forte neige', 77: 'Neige en grains', 80: 'Averses', 81: 'Averses', 82: 'Fortes averses', 85: 'Averses de neige', 86: 'Averses de neige', 95: 'Orage', 96: 'Orage et grêle', 99: 'Orage et grêle' };
   // compteur de plateaux lancés : feuilles terminées + tirs déjà notés des planches en cours
   function compteurHtml() {
-    var J = new Date(); J.setHours(0, 0, 0, 0); var tj = J.getTime(), ta = new Date(J.getFullYear(), 0, 1).getTime(), jour = 0, an = 0, cj = 0, ca = 0, vus = {}, fr = function (n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); };
+    var J = new Date(); J.setHours(0, 0, 0, 0); var tj = J.getTime(), ta = new Date(J.getFullYear(), 0, 1).getTime(), jour = 0, an = 0, cj = 0, ca = 0, vus = {}, pres = {}, fr = function (n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); };
     // cartouches : 1 si le plateau est cassé au 1er coup, 2 s'il est cassé au 2e coup ou raté (les deux coups sont tirés)
-    function compte(c, id) { if (!c || vus[id] || !c.tirs || !(c.date >= ta)) return; vus[id] = 1; var n = c.tirs.length, k = 0; for (var i = 0; i < n; i++) k += c.tirs[i] === 1 ? 1 : 2; an += n; ca += k; if (c.date >= tj) { jour += n; cj += k; } }
+    function compte(c, id) { if (!c || vus[id] || !c.tirs || !(c.date >= ta)) return; vus[id] = 1; var n = c.tirs.length, k = 0; for (var i = 0; i < n; i++) k += c.tirs[i] === 1 ? 1 : 2; an += n; ca += k; if (c.date >= tj) { jour += n; cj += k; (c.tireurs || []).forEach(function (t) { pres[slug(t.nom)] = 1; }); } }
     Object.keys(st.ses).forEach(function (id) { compte(st.ses[id], id); });
     [st.pauses, st.direct || {}, st.cours ? { c: st.cours } : {}].forEach(function (o) { Object.keys(o).forEach(function (k) { compte(o[k], (o[k] && o[k].id) || k); }); });
-    return '<span class="cpt"><b>' + fr(jour) + '</b> plateau' + (jour > 1 ? 'x' : '') + ' · <b>' + fr(cj) + '</b> cartouche' + (cj > 1 ? 's' : '') + '<br>aujourd\'hui<br>' + fr(an) + ' plateaux · ' + fr(ca) + ' cartouches<br>cette année</span>';
+    var np = Object.keys(pres).length;
+    return '<span class="cpt"><b>' + np + '</b> tireur' + (np > 1 ? 's' : '') + ' présent' + (np > 1 ? 's' : '') + '<br><b>' + fr(jour) + '</b> plateau' + (jour > 1 ? 'x' : '') + ' · <b>' + fr(cj) + '</b> cartouche' + (cj > 1 ? 's' : '') + '<br>aujourd\'hui<br>' + fr(an) + ' plateaux · ' + fr(ca) + ' cartouches<br>cette année</span>';
   }
   function meteoHtml() { var m = st.meteo; if (!m) return ''; var d = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'][Math.round(m.dir / 45) % 8]; return '<b>' + m.t + ' °C</b> ' + (MET[m.code] || '') + '<br>Vent ' + m.vent + ' km/h ' + d + (m.raf > m.vent + 4 ? ' · rafales ' + m.raf : ''); }
   function chargerMeteo() {
@@ -471,7 +490,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (st.ecran !== 'tir' && st.ecran !== 'planche' && st.ecran !== 'club') render();
   }
   function corpsLic(l) { var o = {}; ['nom', 'prenom', 'nomf', 'licence', 'categorie', 'tel', 'mail', 'notes'].forEach(function (k) { if (l[k]) o[k] = l[k]; }); return o; }
-  function corpsSes(s) { var o = { disc: s.disc, date: s.date, tireurs: s.tireurs, tirs: s.tirs, termine: true }; if (s.num) { o.pas = s.pas || ''; o.num = s.num; o.no = s.no || 0; } if (s.meteo) o.meteo = s.meteo; return o; }
+  function corpsSes(s) { var o = { disc: s.disc, date: s.date, tireurs: s.tireurs, tirs: s.tirs, termine: true }; if (s.num) { o.pas = s.pas || ''; o.num = s.num; o.no = s.no || 0; } if (s.meteo) o.meteo = s.meteo; if (s.fin) o.fin = s.fin; return o; }
   function meteoFeuille(s) { var m = s && s.meteo; if (!m) return ''; return 'Météo : ' + m.t + ' °C, ' + (MET[m.code] || '').toLowerCase() + ', vent ' + m.vent + ' km/h ' + ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'][Math.round((m.dir || 0) / 45) % 8]; }
   var STAND = { A: 'DTL 1', B: 'FU 2', C: 'DTL 3' }; // noms des pas de tir du club
   function nomPas(disc, pas) { return STAND[pas] || disc; }
@@ -479,7 +498,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function numTxt(s) { return s && s.num ? 'Planche ' + numAff(s.num) + (s.no ? ' · n° ' + ('000' + s.no).slice(-4) : '') : ''; }
   function brancher() {
     if (HORS) {
-      sync = 'attente'; render(); fbSync(true); fbDirect(); chargerMeteo(); setInterval(function () { if (!document.hidden) chargerMeteo(); }, 15 * 60000); reglages(); rafraichir(); setInterval(function () { rafraichir(); reglages(); }, 40 * 60000);
+      sync = 'attente'; render(); fbSync(true); fbDirect(); chargerMeteo(); setInterval(function () { if (!document.hidden) chargerMeteo(); }, 15 * 60000); reglages(); rafraichir(); setInterval(rafraichir, 40 * 60000); setInterval(function () { if (!document.hidden) reglages(); }, 5 * 60000);
       document.addEventListener('visibilitychange', function () { if (!document.hidden) fbSync(false); });
       try { var ml = document.createElement('link'); ml.rel = 'manifest'; ml.href = 'manifest.webmanifest'; document.head.appendChild(ml);
         var ic = document.createElement('link'); ic.rel = 'apple-touch-icon'; ic.href = 'icon-192.png'; document.head.appendChild(ic);
@@ -526,7 +545,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   function flash(r, disc) { try { var f = document.createElement('div'); f.className = 'flash f' + r; f.textContent = disc === 'DTL' ? (r === 1 ? '3' : r === 2 ? '2' : '0') : (r ? '1' : '0'); document.body.appendChild(f); setTimeout(function () { f.remove(); }, 540); } catch (e) {} }
   function terminer() {
-    var s = st.cours; s.termine = true; if (st.meteo) s.meteo = { t: st.meteo.t, code: st.meteo.code, vent: st.meteo.vent, dir: Math.round(st.meteo.dir) }; st.ses[s.id] = s; st.cours = null; saveLocal(); mort(s.id);
+    var s = st.cours; s.termine = true; s.fin = Date.now(); if (st.meteo) s.meteo = { t: st.meteo.t, code: st.meteo.code, vent: st.meteo.vent, dir: Math.round(st.meteo.dir) }; st.ses[s.id] = s; st.cours = null; saveLocal(); mort(s.id);
     pousser('sessions', s.id, corpsSes(s)); st.vue = s.id; st.edit = false; st.copie = ''; st.ecran = 'resultat'; render();
   }
   function resume(s) {
@@ -682,7 +701,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     return h;
   }
   var GT = [['moy', 'Moyenne'], ['best4', '4 meilleures'], ['assid', 'Assiduité'], ['record', 'Record'], ['prog', 'Progression'], ['mois', 'Du mois']];
-  function general(disc, type, qui, min3, depuis) {
+  function general(disc, type, qui, min3, depuis, cat) {
     type = type || 'moy'; var m = {}, now = new Date(), m0 = new Date(now.getFullYear(), now.getMonth(), 1).getTime(), add = function (p, q) { return p + q; };
     Object.keys(st.ses).forEach(function (id) { var s = st.ses[id]; if (s.disc !== disc || (type === 'mois' && s.date < m0) || (depuis && s.date < depuis)) return;
       bilan(s).forEach(function (x) { var k = slug(x.nom), o = m[k] || (m[k] = { nom: x.nom, n: 0, tot: 0, best: 0, inv: true, L: [] }); o.n++; o.tot += x.total; if (x.total > o.best || !o.bid) { o.best = Math.max(o.best, x.total); o.bid = id; } if (s.tireurs[x.i].statut !== 'invite') o.inv = false; o.L.push([s.date, x.total]); }); });
@@ -691,17 +710,20 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       o.b4 = d.slice(0, 4).reduce(add, 0); o.prog = o.n >= 6 ? (t.slice(-3).reduce(add, 0) - t.slice(0, 3).reduce(add, 0)) / 3 : 0;
       o.v = type === 'best4' ? o.b4 : type === 'assid' ? o.tot : type === 'record' ? o.best : type === 'prog' ? o.prog : o.moy;
       o.ok = type === 'prog' ? o.n >= 6 : (type === 'moy' && min3 ? o.n >= 3 : true); return o; });
+    if (cat) a = a.filter(function (o) { return catDe(o.nom).toLowerCase() === cat.toLowerCase(); });
     if (qui === 'lic') a = a.filter(function (o) { return !o.inv; }); else if (qui === 'inv') a = a.filter(function (o) { return o.inv; });
     a.sort(function (p, q) { return (q.ok - p.ok) || (p.ok ? q.v - p.v : 0) || q.best - p.best || q.n - p.n || p.nom.localeCompare(q.nom, 'fr'); });
     a.forEach(function (o, j) { o.rang = !o.ok ? 0 : (j > 0 && a[j - 1].ok && a[j - 1].v === o.v) ? a[j - 1].rang : j + 1; });
     return a;
   }
   function vGeneral() {
-    var d = st.gdisc, ty = st.gtype, a = general(d, ty, st.gqui, st.gmin), mx = maxPts(d), dec = function (v) { return (Math.round(v * 10) / 10).toString().replace('.', ','); };
+    var d = st.gdisc, ty = st.gtype, a = general(d, ty, st.gqui, st.gmin, 0, st.gcat || ''), mx = maxPts(d), dec = function (v) { return (Math.round(v * 10) / 10).toString().replace('.', ','); };
     var bt = function (act, k, v, cur, lab) { return '<button' + (cur === v ? ' class="primary"' : '') + ' data-act="' + act + '" data-' + k + '="' + v + '">' + lab + '</button>'; };
     var h = entete('Classement', 'accueil') + '<div class="row"><button style="flex:1"' + (d === 'DTL' ? ' class="primary"' : '') + ' data-act="gdisc" data-d="DTL">DTL</button><button style="flex:1"' + (d === 'FU' ? ' class="primary"' : '') + ' data-act="gdisc" data-d="FU">FU</button></div>';
     h += '<div class="chips">' + GT.map(function (g) { return bt('gtype', 't', g[0], ty, g[1]); }).join('') + '</div>';
     h += '<div class="chips">' + bt('gqui', 'q', 'tous', st.gqui, 'Tous') + bt('gqui', 'q', 'lic', st.gqui, 'Licenciés') + bt('gqui', 'q', 'inv', st.gqui, 'Invités') + (ty === 'moy' ? '<button' + (st.gmin ? ' class="primary"' : '') + ' data-act="gmin">3 séries minimum</button>' : '') + '</div>';
+    var cats = {}; Object.keys(st.lic).forEach(function (k) { var c = catDe(st.lic[k].nom); if (c) cats[c.toLowerCase()] = c; }); var lc = Object.keys(cats).sort();
+    if (lc.length) h += '<div class="chips">' + bt('gcat', 'c', '', st.gcat || '', 'Toutes catégories') + lc.map(function (k) { return bt('gcat', 'c', k, (st.gcat || '').toLowerCase(), esc(cats[k])); }).join('') + '</div>';
     var expl = { moy: 'Classé sur la moyenne par série de 25 plateaux' + (st.gmin ? ', à partir de 3 séries' : '') + '.', best4: 'Classé sur le total des 4 meilleures séries.', assid: 'Classé sur le total de points cumulés : plus on tire, plus on monte.', record: 'Classé sur la meilleure série.', prog: 'Classé sur la progression : moyenne des 3 dernières séries moins moyenne des 3 premières, à partir de 6 séries.', mois: 'Classé sur la moyenne par série, séries du mois en cours uniquement.' }[ty];
     if (!a.length) return h + '<p class="muted">Aucune série ' + d + ' à classer ici pour le moment.</p><p class="small muted">' + expl + '</p>';
     function ligne(o) {
@@ -721,7 +743,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   function vPas() {
     var v = st.pasVu || { disc: 'DTL', pas: '' }, L = enCoursAu(v.disc, v.pas), occ = L.some(function (x) { return x.e === 'occupe'; });
-    var h = entete(nomPas(v.disc, v.pas), 'accueil');
+    var h = entete(nomPas(v.disc, v.pas), 'accueil') + (v.pas ? lancAlerte(v.pas) : '');
     if (!L.length) h += '<p class="muted">Aucune planche en cours ici.</p>';
     var att = 0; L.forEach(function (x) { var c = x.s, e = etat(c);
       var rg = e.n ? 0 : ++att; h += '<div class="card"><h2>' + (c.num ? numAff(c.num) + ' · ' : '') + (e.n ? 'en cours' : rg === 1 ? 'prochaine à passer' : rg + 'e à passer') + '</h2>' + (c.no ? '<p class="small muted">Planche n° ' + ('000' + c.no).slice(-4) + ' de l\'année</p>' : '') + '<p><b>' + esc(c.tireurs.map(function (t) { return nomCourt(t.nom); }).join(', ')) + '</b><br><span class="small muted">' + (e.n ? 'Commencée à ' + fdate(c.date).slice(11) + ' · ' + e.n + ' tirs notés sur ' + e.total : 'Préparée à ' + fdate(c.date).slice(11) + ', pas encore commencée') + '</span></p>';
@@ -764,8 +786,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     function rec(depuis) { var o = null; ['DTL', 'FU'].forEach(function (dc) { if (o) return; Object.keys(st.ses).forEach(function (id) { var s = st.ses[id]; if (s.disc !== dc || s.date < depuis) return; bilan(s).forEach(function (x) { if (!o || x.total > o.v) o = { v: x.total, nom: x.nom, d: dc, id: id }; }); }); }); return o; }
     function kpi(v, lab) { return '<div class="kpi"><b>' + v + '</b><span>' + lab + '</span></div>'; }
     function krec(o, lab) { return o ? '<div class="kpi clic" role="button" tabindex="0" data-act="voir" data-id="' + o.id + '"><b>' + o.v + '<small>/' + maxPts(o.d) + '</small></b><span>' + lab + ' ' + o.d + ' · ' + esc(nomCourt(o.nom)) + '</span></div>' : kpi('-', lab); }
-    h += '<div class="card"><div class="kpis">' + kpi(L.length, 'planche' + (L.length > 1 ? 's' : '') + ' en cours') + kpi(nbS, 'séries aujourd\'hui') + kpi(nbS * NB, 'plateaux du jour') + krec(rec(t0[0]), 'meilleure du jour') + krec(rec(t0[2]), 'record du mois') + krec(rec(t0[3]), 'record de l\'année') + '</div></div>';
-    h += '<div class="sup"><div class="stack">';
+    h += '<div class="card"><div class="kpis">' + kpi(L.length, 'planche' + (L.length > 1 ? 's' : '') + ' en cours') + kpi((function () { var o = {}; duJour.concat(L).forEach(function (c) { (c.tireurs || []).forEach(function (t) { o[slug(t.nom)] = 1; }); }); return Object.keys(o).length; })(), 'tireurs présents') + kpi(nbS, 'séries aujourd\'hui') + kpi(nbS * NB, 'plateaux du jour') + krec(rec(t0[0]), 'meilleure du jour') + krec(rec(t0[2]), 'record du mois') + krec(rec(t0[3]), 'record de l\'année') + '</div></div>';
+    h += ['A', 'B', 'C'].map(lancAlerte).join('') + '<div class="sup"><div class="stack">';
     if (!L.length) h += '<div class="card"><h2>Aucune planche en cours</h2><p class="muted">Les planches apparaissent ici dès qu\'elles démarrent, et se mettent à jour à chaque tir.</p></div>';
     h += '<div class="mur">';
     L.forEach(function (s) {
@@ -824,9 +846,10 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       return h;
     }
     var ids = Object.keys(st.lic).sort(function (a, b) { return st.lic[a].nom.localeCompare(st.lic[b].nom, 'fr'); });
+    if (HORS) h += '<div class="card"><h2>Lanceurs</h2><p class="small muted">Plateaux lancés à chaque pas de tir depuis le dernier rechargement. Indiquez la capacité pour être prévenu quand il faut recharger.</p>' + ['A', 'B', 'C'].map(function (l) { var o = st.lanceurs[l] || {}, n = lancCompte(l); return '<div class="item col"><span><b>' + STAND[l] + '</b> · ' + n + ' plateaux lancés' + (o.depuis ? ' depuis le ' + fdate(o.depuis) : '') + (o.cap ? ' · reste environ ' + Math.max(0, o.cap - n) + ' sur ' + o.cap : '') + '</span><span class="row"><input type="number" inputmode="numeric" id="lc_' + l + '" placeholder="Capacité" value="' + (o.cap || '') + '" style="flex:1;min-width:90px"><button data-act="lancre" data-p="' + l + '">Rechargé</button></span></div>'; }).join('') + '<button data-act="lancsave">Enregistrer les capacités</button></div>';
     if (HORS) h += '<div class="card"><h2>Code du club</h2><p class="small muted">' + (MEMBRES ? 'Un code du club est en service : il faut être connecté à l\'espace membre pour noter une planche.' : 'Aucun code défini : tout le monde peut noter avec le QR code. Définir un code réserve la notation aux membres connectés.') + '</p>' + (MEMBRES ? '<input type="password" id="ccold" autocomplete="off" placeholder="Code actuel du club">' : '') + '<input type="password" id="ccnew" autocomplete="off" placeholder="' + (MEMBRES ? 'Nouveau code du club' : 'Code du club (4 caractères minimum)') + '"><button data-act="codeclub">' + (MEMBRES ? 'Changer le code du club' : 'Définir le code du club') + '</button></div>' +
       '<div class="card"><h2>Mot de passe administrateur</h2><input type="password" id="apnew" autocomplete="off" placeholder="Nouveau mot de passe (6 caractères minimum)"><button data-act="adminpass">Changer le mot de passe</button></div>' + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '');
-    h += '<p class="small muted">Mode administrateur actif : correction d\'un tir et suppression d\'une feuille depuis « Gérer les feuilles ».</p><div class="row"><button style="flex:1" data-act="aller" data-e="historique">Gérer les feuilles</button><button style="flex:1" data-act="clublock">Verrouiller</button></div>';
+    h += '<button class="ghost" data-act="resync">Tout resynchroniser sur ce téléphone</button><p class="small muted">Mode administrateur actif : correction d\'un tir et suppression d\'une feuille depuis « Gérer les feuilles ».</p><div class="row"><button style="flex:1" data-act="aller" data-e="historique">Gérer les feuilles</button><button style="flex:1" data-act="clublock">Verrouiller</button></div>';
     h += '<div class="card"><h2>Récupérer les feuilles (' + Object.keys(st.ses).length + ')</h2><p class="small muted">Fichiers lisibles dans Excel. La sauvegarde complète contient toutes les feuilles tir par tir.</p>' + ((dl || HORS) ? '<button data-act="xtout">Toutes les feuilles (CSV)</button><button data-act="xgen">Classement général (CSV)</button><button data-act="xjson">Sauvegarde complète (JSON)</button>' : '<p class="err">Téléchargement indisponible dans cette vue.</p>') + '</div>';
     h += '<button class="primary" data-act="fnew">Ajouter un licencié</button>';
     if (!ids.length) return h + '<p class="muted">Aucun licencié pour le moment.</p>';
@@ -1172,6 +1195,11 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (a !== 'suppr' && a !== 'dellic' && a !== 'fdel' && a !== 'sesdel' && a !== 'seldel') st.suppr = null;
     if (a === 'aller' && b.dataset.e !== 'membre') st.apres = null;
     if (a === 'aller') { if (b.dataset.e === 'direct') dirGo(); if (b.dataset.e === 'accueil') fbDirect(); if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; }
+    else if (a === 'lancre' || a === 'lancsave') {
+      ['A', 'B', 'C'].forEach(function (l) { var el = document.getElementById('lc_' + l), v = el ? parseInt(el.value, 10) : 0, o = st.lanceurs[l] || (st.lanceurs[l] = {}); if (v > 0) o.cap = v; else delete o.cap; });
+      if (a === 'lancre') st.lanceurs[b.dataset.p].depuis = Date.now();
+      b.disabled = true; lancSauve().then(function (r) { st.msg = r.ok ? 'Lanceurs enregistrés.' : 'Enregistrement impossible : reconnectez-vous à l\'espace administrateur.'; render(); }, function () { st.msg = 'Pas de réseau : enregistrement impossible.'; render(); }); return;
+    }
     else if (a === 'membreout') { st.membre = null; jetonM = null; lset('btc.membre', null); }
     else if (a === 'membrein') {
       var mc = (document.getElementById('mcode') || {}).value || '', mn = ((document.getElementById('mnom') || {}).value || '').trim().replace(/\s+/g, ' '), mk = slug(mn);
@@ -1204,10 +1232,10 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'sel') { if (st.sel[b.dataset.id]) delete st.sel[b.dataset.id]; else st.sel[b.dataset.id] = 1; }
     else if (a === 'seltout') { var tous = Object.keys(st.ses), plein = tous.every(function (id) { return st.sel[id]; }); st.sel = {}; if (!plein) tous.forEach(function (id) { st.sel[id] = 1; }); }
     else if (a === 'seldel') { st.suppr = 'sel'; }
-    else if (a === 'seldelOk') { if (st.clubOk) Object.keys(st.sel).forEach(function (id) { if (!st.ses[id]) return; delete st.ses[id]; retirer('sessions', id); }); st.sel = {}; saveLocal(); }
+    else if (a === 'seldelOk') { if (st.clubOk) Object.keys(st.sel).forEach(function (id) { if (!st.ses[id]) return; delete st.ses[id]; retirer('sessions', id); }); st.sel = {}; saveLocal(); signalSync(); }
     else if (a === 'selcsv') { telecharger('btc-gas-selection-' + horodate() + '.csv', csvTout(st.sel)); return; }
     else if (a === 'selenv') { envoyerSel(); return; }
-    else if (a === 'sesdelOk') { var sid = st.vue; delete st.ses[sid]; saveLocal(); retirer('sessions', sid); st.edit = false; st.ecran = 'historique'; }
+    else if (a === 'sesdelOk') { var sid = st.vue; delete st.ses[sid]; saveLocal(); retirer('sessions', sid); signalSync(); st.edit = false; st.ecran = 'historique'; }
     else if (a === 'clubin') { var cp = document.getElementById('cpass'), code = cp ? cp.value : '';
       if (HORS) { if (!code) return; b.disabled = true; b.textContent = 'Connexion…'; fbLogin(code).then(function (tk) { jeton = tk; st.clubOk = true; st.msg = ''; render(); fbFiches(); }, function () { st.msg = navigator.onLine === false ? 'Pas de réseau : connexion impossible.' : 'Mot de passe incorrect.'; render(); }); return; }
       if (code === CLUB_PASS) { st.clubOk = true; st.msg = ''; } else st.msg = 'Mot de passe incorrect.'; }
@@ -1245,6 +1273,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'gtype') st.gtype = b.dataset.t;
     else if (a === 'gqui') st.gqui = b.dataset.q;
     else if (a === 'gmin') st.gmin = !st.gmin;
+    else if (a === 'resync') { fbSync('tout'); st.msg = 'Resynchronisation lancée.'; }
+    else if (a === 'gcat') st.gcat = b.dataset.c;
     else if (a === 'imprimer') { try { window.print(); } catch (e) {} return; }
     else if (a === 'tireur') { st.tireur = b.dataset.k; st.retourT = st.ecran; st.ecran = 'tireur'; window.scrollTo(0, 0); }
     else if (a === 'dper') { st.dper = +b.dataset.k; st.dtic = 0; }
@@ -1252,7 +1282,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'xgen') { telecharger('btc-gas-classement-' + horodate() + '.csv', csvGeneral()); return; }
     else if (a === 'xjson') { telecharger('btc-gas-sauvegarde-' + horodate() + '.json', jsonTout()); return; }
     else if (a === 'skin') { st.skin = st.skin === 'sombre' ? 'clair' : 'sombre'; lset('btc.skin2', st.skin); peau(); }
-    else if (a === 'cell') { if (!st.edit || !st.clubOk) return; s = st.ses[st.vue]; var idx = (+b.dataset.k) * s.tireurs.length + (+b.dataset.i), r = s.tirs[idx]; s.tirs[idx] = r === 1 ? 2 : r === 2 ? 0 : 1; saveLocal(); pousser('sessions', st.vue, corpsSes(s)); }
+    else if (a === 'cell') { if (!st.edit || !st.clubOk) return; s = st.ses[st.vue]; var idx = (+b.dataset.k) * s.tireurs.length + (+b.dataset.i), r = s.tirs[idx]; s.tirs[idx] = r === 1 ? 2 : r === 2 ? 0 : 1; s.fin = Date.now(); saveLocal(); pousser('sessions', st.vue, corpsSes(s)); }
     else if (a === 'rejouer') { s = st.ses[st.vue]; nouvellePlanche(s.disc, s.tireurs.map(function (t) { return t.nom; }), s.pas); }
     else if (a === 'copier') { s = st.ses[st.vue]; var txt = resume(s); st.copie = 'Si la copie n\'a pas fonctionné, sélectionnez le texte ci-dessous.';
       try { navigator.clipboard.writeText(txt).then(function () { st.copie = 'Résultat copié. Collez-le dans un message ou un mail.'; render(); }, function () {}); } catch (e) {} }
