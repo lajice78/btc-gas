@@ -529,7 +529,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     [st.pauses, st.direct || {}, st.cours ? { c: st.cours } : {}].forEach(function (o) { Object.keys(o).forEach(function (k) { compte(o[k], (o[k] && o[k].id) || k); }); });
     var np = Object.keys(pres).length;
     var PLOMB = 28, kg = function (n) { var v = n * PLOMB / 1000; return (v >= 100 ? fr(Math.round(v)) : (Math.round(v * 10) / 10).toString().replace('.', ',')) + ' kg'; }; // charge supposée : 28 g de plomb par cartouche
-    return '<span class="cpt"><b>' + np + '</b> tireur' + (np > 1 ? 's' : '') + ' présent' + (np > 1 ? 's' : '') + '<br><b>' + fr(jour) + '</b> plateau' + (jour > 1 ? 'x' : '') + ' · <b>' + fr(cj) + '</b> cartouche' + (cj > 1 ? 's' : '') + '<br><b>' + kg(cj) + '</b> de plomb aujourd\'hui<br>' + fr(an) + ' plateaux · ' + fr(ca) + ' cartouches<br>' + kg(ca) + ' de plomb cette année</span>';
+    return '<span class="cpt"><b>' + np + '</b> tireur' + (np > 1 ? 's' : '') + ' présent' + (np > 1 ? 's' : '') + '<br><b>' + fr(jour) + '</b> plateau' + (jour > 1 ? 'x' : '') + ' · <b>' + fr(cj) + '</b> cartouche' + (cj > 1 ? 's' : '') + '<br>aujourd\'hui<br>' + fr(an) + ' plateaux · ' + fr(ca) + ' cartouches<br>cette année</span>';
   }
   function meteoHtml() { var m = st.meteo; if (!m) return ''; var d = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'][Math.round(m.dir / 45) % 8]; return '<b>' + m.t + ' °C</b> ' + (MET[m.code] || '') + '<br>Vent ' + m.vent + ' km/h ' + d + (m.raf > m.vent + 4 ? ' · rafales ' + m.raf : ''); }
   function chargerMeteo() {
