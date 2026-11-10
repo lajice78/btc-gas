@@ -761,6 +761,11 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       tp.setY(a, h + (d > 14 ? 0.4 * n : 0)); tc[a * 3] = Math.pow(cr, 2.2) * 1.1; tc[a * 3 + 1] = Math.pow(cg, 2.2) * 1.1; tc[a * 3 + 2] = Math.pow(cb, 2.2) * 1.1;
     }
     tg.setAttribute('color', new T.BufferAttribute(tc, 3)); tg.computeVertexNormals(); var terrain = new T.Mesh(tg, new T.MeshStandardMaterial({ vertexColors: true, roughness: 1, map: K.tex('grain', 70) })); terrain.receiveShadow = true; sc.add(terrain);
+    // talus de la carrière : vraie matière (terre et calcaire) nette, au lieu de la photo étirée sur la pente
+    var bg = tg.clone(), bi = tg.index.array, bj = [], bu = bg.attributes.uv, bc = bg.attributes.color;
+    for (var q0 = 0; q0 < bi.length; q0 += 3) { var dm = 99, dM = -99; for (var q1 = 0; q1 < 3; q1++) { var dd0 = dehors(tp.getX(bi[q0 + q1]), tp.getZ(bi[q0 + q1])); dm = Math.min(dm, dd0); dM = Math.max(dM, dd0); } if (dM > 0.5 && dm < 12.5) bj.push(bi[q0], bi[q0 + 1], bi[q0 + 2]); }
+    for (var q2 = 0; q2 < tp.count; q2++) { bu.setXY(q2, (tp.getX(q2) + tp.getZ(q2) * 0.6) / 16, tp.getY(q2) / 7 + tp.getZ(q2) / 40); var kk = 0.72 + 0.28 * Math.sin(tp.getX(q2) * 0.31) * Math.cos(tp.getZ(q2) * 0.27), hh = tp.getY(q2) / HR; bc.setXYZ(q2, (0.62 + 0.2 * hh) * kk + 0.16, (0.56 + 0.16 * hh) * kk + 0.14, (0.42 + 0.1 * hh) * kk + 0.1); }
+    bg.setIndex(bj); var talus = new T.Mesh(bg, new T.MeshStandardMaterial({ map: K.tex('grain', 1), vertexColors: true, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); talus.receiveShadow = true; talus.visible = false; sc.add(talus);
     // couronne lointaine autour de la zone détaillée
     var og = new T.PlaneGeometry(640, 600, 8, 8); og.rotateX(-Math.PI / 2); var oi = og.index.array, op = og.attributes.position, oj = [];
     for (var b = 0; b < oi.length; b += 3) { var mxx = (op.getX(oi[b]) + op.getX(oi[b + 1]) + op.getX(oi[b + 2])) / 3, mzz = (op.getZ(oi[b]) + op.getZ(oi[b + 1]) + op.getZ(oi[b + 2])) / 3; if (Math.abs(mxx) > 160 || Math.abs(mzz) > 150) oj.push(oi[b], oi[b + 1], oi[b + 2]); }
@@ -820,7 +825,10 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
           PAS.forEach(function (p) { if (Math.hypot(x - p.b[0], z - p.b[1]) < 11 || Math.hypot(x - p.t[0], z - p.t[1]) < 6) pres = true; }); if (pres || Math.hypot(x - CH[0], z - CH[1]) < 11) continue;
           l2.push({ x: x, y: haut(x, z), z: z, s: 2.5 + r2() * 1.9 });
         }
-        terrain.material = new T.MeshStandardMaterial({ map: tx, roughness: 1, color: K.lin(0xdfe4ea) }); gProc.visible = false; if (gArb) sc.remove(gArb); gArb = K.arbres(sc, l2, [0x3d4d36, 0x48593e, 0x536648, 0x364430, 0x5d704e]); photo = true;
+        var grainT = K.tex('grain', 1), tm = new T.MeshStandardMaterial({ map: tx, roughness: 1, color: K.lin(0xdfe4ea) });
+        tm.onBeforeCompile = function (sh) { sh.uniforms.grainT = { value: grainT }; sh.fragmentShader = 'uniform sampler2D grainT;\n' + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n diffuseColor.rgb *= 0.74 + 0.36 * texture2D( grainT, vUv * 90.0 ).g;'); };
+        terrain.material = tm;
+        for (var v9 = 0; v9 < tp.count; v9++) { var i9 = (Math.max(0, Math.min(299, Math.round(tp.getZ(v9) + 150))) * 320 + Math.max(0, Math.min(319, Math.round(tp.getX(v9) + 160)))) * 4; bc.setXYZ(v9, Math.pow(d[i9] / 255, 2.2) * 1.25, Math.pow(d[i9 + 1] / 255, 2.2) * 1.25, Math.pow(d[i9 + 2] / 255, 2.2) * 1.25); } bc.needsUpdate = true; gProc.visible = false; talus.visible = true; if (gArb) sc.remove(gArb); gArb = K.arbres(sc, l2, [0x3d4d36, 0x48593e, 0x536648, 0x364430, 0x5d704e]); photo = true;
       });
       charge(U + '48.5587745,1.674706,48.5641705,1.683392&WIDTH=1024&HEIGHT=960', function (tx) { loin.material = new T.MeshStandardMaterial({ map: tx, roughness: 1, color: K.lin(0xdfe4ea) }); });
     })();
