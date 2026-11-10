@@ -909,7 +909,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   var CH = [['prenom', 'Prénom', 'text'], ['nomf', 'Nom', 'text'], ['licence', 'N° de licence', 'text'], ['categorie', 'Catégorie', 'text'], ['tel', 'Téléphone', 'tel'], ['mail', 'E-mail', 'email']];
   function vClub() {
     var h = entete(st.clubOk ? 'Gestion du club' : 'Administrateur', 'accueil');
-    if (!st.clubOk) return h + '<div class="card"><h2>Accès réservé à l\'administrateur</h2><input type="password" id="cpass" inputmode="numeric" autocomplete="off" placeholder="Mot de passe"><button class="primary" data-act="clubin">Entrer</button>' + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '') + '</div>';
+    if (!st.clubOk) return h + '<div class="card"><h2>Accès réservé à l\'administrateur</h2><input type="password" id="cpass" autocomplete="off" autocapitalize="none" placeholder="Mot de passe"><button class="primary" data-act="clubin">Entrer</button>' + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '') + '</div>';
     if (st.fiche !== null) {
       var l = st.lic[st.fiche] || {}, anc = !l.prenom && !l.nomf && l.nom ? l.nom : '';
       h += '<div class="card"><h2>' + (st.fiche ? 'Fiche du licencié' : 'Nouveau licencié') + '</h2>';
