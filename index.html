@@ -543,7 +543,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     function compte(c, id) { if (!c || vus[id] || !c.tirs || !(c.date >= ta)) return; vus[id] = 1; var n = c.tirs.length, k = 0; for (var i = 0; i < n; i++) k += c.tirs[i] === 1 ? 1 : 2; an += n; ca += k; if (c.date >= tj) { jour += n; cj += k; (c.tireurs || []).forEach(function (t) { pres[slug(t.nom)] = 1; }); } }
     Object.keys(st.ses).forEach(function (id) { compte(st.ses[id], id); });
     [st.pauses, st.direct || {}, st.cours ? { c: st.cours } : {}].forEach(function (o) { Object.keys(o).forEach(function (k) { compte(o[k], (o[k] && o[k].id) || k); }); });
-    var np = Object.keys(pres).length;
+    var np = Object.keys(pres).length; st.np = np;
     var PLOMB = 28, kg = function (n) { var v = n * PLOMB / 1000; return (v >= 100 ? fr(Math.round(v)) : (Math.round(v * 10) / 10).toString().replace('.', ',')) + ' kg'; }; // charge supposée : 28 g de plomb par cartouche
     return '<span class="cpt"><b>' + np + '</b> tireur' + (np > 1 ? 's' : '') + ' présent' + (np > 1 ? 's' : '') + '<br><b>' + fr(jour) + '</b> plateau' + (jour > 1 ? 'x' : '') + ' · <b>' + fr(cj) + '</b> cartouche' + (cj > 1 ? 's' : '') + '<br>aujourd\'hui<br>' + fr(an) + ' plateaux · ' + fr(ca) + ' cartouches<br>cette année</span>';
   }
@@ -1085,7 +1085,11 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     function bande(x1, z1, x2, z2, w, y, c) { var L = Math.hypot(x2 - x1, z2 - z1), m = new T.Mesh(new T.BoxGeometry(L, 0.12, w), c === 'g' ? K.MT('gravier', L / 5, w / 5) : M(c)); m.receiveShadow = true; m.position.set((x1 + x2) / 2, y, (z1 + z2) / 2); m.rotation.y = -Math.atan2(z2 - z1, x2 - x1); gProc.add(m); }
     bande(-120, 10, -56, 35, 5, 0.1, 'g'); bande(-56, 35, -22, 24, 5, 0.1, 'g');
     var park = new T.Mesh(new T.CylinderGeometry(11, 11, 0.12, 14), K.MT('gravier', 5)); park.receiveShadow = true; park.scale.set(1.25, 1, 0.8); park.position.set(-14, 0.1, 20); park.rotation.y = 0.4; gProc.add(park);
-    [[-19, 22, 0.5, 0x9a2b2b], [-12, 24, 0.2, 0xe6e6e6], [-8, 19, 1.2, 0x2d3e63]].forEach(function (c) { var g = new T.Group(), b1 = new T.Mesh(new T.BoxGeometry(4.2, 1.1, 1.8), M(c[3], { roughness: 0.5 })), b2 = new T.Mesh(new T.BoxGeometry(2.3, 0.9, 1.6), M(0x1c2430, { roughness: 0.3 })); b1.position.y = 0.85; b2.position.set(-0.2, 1.75, 0); g.add(b1); g.add(b2); [[-1.3, 0.95], [1.3, 0.95], [-1.3, -0.95], [1.3, -0.95]].forEach(function (w) { var ro = new T.Mesh(new T.CylinderGeometry(0.38, 0.38, 0.25, 12), M(0x15171a)); ro.rotation.x = Math.PI / 2; ro.position.set(w[0], 0.38, w[1]); g.add(ro); }); g.position.set(c[0], 0.1, c[1]); g.rotation.y = c[2]; K.ombre(g); sc.add(g); });
+    // voitures : deux rangées sur le parking, affichées selon le nombre de tireurs présents
+    var voit = [], coulV = [0x9a2b2b, 0xe6e6e6, 0x2d3e63, 0x3a3d42, 0xb9bcc2, 0x1f5a3a, 0x7a1f2b, 0xd8d2c4, 0x20304a, 0x6b6f76, 0xf2f2f2, 0x8c5a2b, 0x14161a, 0x4a6a8a], ordV = [3, 10, 1, 5, 12, 8, 0, 6, 13, 2, 9, 4, 11, 7], placesV = [];
+    for (var pv = 0; pv < 14; pv++) { var lx = -9 + (pv % 7) * 3, lz = pv < 7 ? 4.4 : -4.4, ca = Math.cos(0.4), sa = Math.sin(0.4); placesV.push([-14 + lx * ca + lz * sa, 20 - lx * sa + lz * ca, 0.4 + Math.PI / 2 + ((pv * 37) % 7 - 3) * 0.03, coulV[pv]]); }
+    ordV.map(function (q) { return placesV[q]; }).forEach(function (c) { var g = new T.Group(), b1 = new T.Mesh(new T.BoxGeometry(4.2, 1.1, 1.8), M(c[3], { roughness: 0.5 })), b2 = new T.Mesh(new T.BoxGeometry(2.3, 0.9, 1.6), M(0x1c2430, { roughness: 0.3 })); b1.position.y = 0.85; b2.position.set(-0.2, 1.75, 0); g.add(b1); g.add(b2); [[-1.3, 0.95], [1.3, 0.95], [-1.3, -0.95], [1.3, -0.95]].forEach(function (w) { var ro = new T.Mesh(new T.CylinderGeometry(0.38, 0.38, 0.25, 12), M(0x15171a)); ro.rotation.x = Math.PI / 2; ro.position.set(w[0], 0.38, w[1]); g.add(ro); }); g.position.set(c[0], 0.1, c[1]); g.rotation.y = c[2]; K.ombre(g); g.visible = false; voit.push(g); sc.add(g); });
+    function voitures(n) { n = Math.max(0, Math.min(voit.length, n | 0)); voit.forEach(function (g, i) { g.visible = i < n; }); }
     // bâtiments (x, z, longueur, largeur, angle, toit, type)
     function bat(x, z, L, W, rot, roofC, abri) {
       var g = new T.Group(), hm = abri ? 2.7 : 3.0, rh = 1.5;
@@ -1166,11 +1170,11 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     function boucle() { if (!cv.isConnected || document.hidden) { run = false; return; } dessin((performance.now() - t0) / 1000); requestAnimationFrame(boucle); }
     function go() { pins = cv.parentNode ? Array.prototype.slice.call(cv.parentNode.querySelectorAll('.pin')) : null; if (calme) { dessin(0.8); return; } if (!run) { run = true; requestAnimationFrame(boucle); } }
     document.addEventListener('visibilitychange', function () { if (!document.hidden && cv.isConnected) go(); });
-    return { cv: cv, go: go, meteo: meteo };
+    return { cv: cv, go: go, meteo: meteo, voitures: voitures };
   }
   function hero3d() {
     var hero = document.querySelector('.hero'); if (!hero || !window.THREE) return;
-    try { if (!G3) G3 = creer3d(); if (G3.cv.parentNode !== hero) hero.insertBefore(G3.cv, hero.children[1] || null); hero.classList.add('on3d'); app.classList.add('club3d'); if (st.meteo && G3.meteo && G3.metVu !== st.meteo) { G3.metVu = st.meteo; G3.meteo(st.meteo); } G3.go(); }
+    try { if (!G3) G3 = creer3d(); if (G3.cv.parentNode !== hero) hero.insertBefore(G3.cv, hero.children[1] || null); hero.classList.add('on3d'); app.classList.add('club3d'); if (st.meteo && G3.meteo && G3.metVu !== st.meteo) { G3.metVu = st.meteo; G3.meteo(st.meteo); } if (G3.voitures) G3.voitures(st.np || 0); G3.go(); }
     catch (e) { G3 = null; window.THREE = null; hero.classList.remove('on3d'); app.classList.remove('club3d'); }
   }
   window.addEventListener('load', hero3d);
