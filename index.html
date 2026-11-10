@@ -334,6 +334,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function lget(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
   function lset(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   st.lic = lget('btc.lic', {}); st.ses = lget('btc.ses', {}); st.cours = lget('btc.cours', null); st.pauses = lget('btc.pauses', {});
+  var ME = lget('btc.tel', null); if (!ME) { ME = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); lset('btc.tel', ME); }
+  var VERROU = 10 * 60000; // une planche notée sur un autre téléphone reste verrouillée tant qu'il a été actif dans les 10 dernières minutes
   st.skin = lget('btc.skin2', 'sombre');
   function peau() { document.documentElement.classList.toggle('clair', st.skin !== 'sombre'); }
   peau();
@@ -392,10 +394,13 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   /* ---- planches en cours, visibles en direct au club-house ---- */
   var dirT = null, DIRECT_ON = true;
-  function vivre() { var s = st.cours; if (!HORS || !DIRECT_ON || !s) return; fetch(FB + 'direct/' + encodeURIComponent(s.id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: fbEnc({ disc: s.disc, pas: s.pas || '', date: s.date, maj: Date.now(), tireurs: s.tireurs, tirs: s.tirs }).mapValue.fields }) }).catch(function () {}); }
+  function vivre(s0) { var s = s0 || st.cours; if (!HORS || !DIRECT_ON || !s) return; fetch(FB + 'direct/' + encodeURIComponent(s.id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: fbEnc({ disc: s.disc, pas: s.pas || '', date: s.date, maj: Date.now(), tel: ME, tireurs: s.tireurs, tirs: s.tirs }).mapValue.fields }) }).catch(function () {}); }
   function mort(id) { if (!HORS || !DIRECT_ON || !id) return; fetch(FB + 'direct/' + encodeURIComponent(id), { method: 'DELETE' }).catch(function () {}); }
-  function fbDirect() { if (!HORS || !DIRECT_ON) return; fbListe('direct', '', {}).then(function (d) { var av = Object.keys(st.direct || {}).join(); st.direct = d; if (st.ecran === 'direct' || (st.ecran === 'accueil' && av !== Object.keys(d).join())) render(); }).catch(function () {}); }
+  function fbDirect() { if (!HORS || !DIRECT_ON) return; fbListe('direct', '', {}).then(function (d) { var av = Object.keys(st.direct || {}).join(); st.direct = d; var parti = false, ailleurs = function (c) { return c && d[c.id] && d[c.id].tel && d[c.id].tel !== ME && !(c.pris > Date.now() - 20000); };
+    Object.keys(st.pauses).forEach(function (id) { if (ailleurs(st.pauses[id])) { delete st.pauses[id]; parti = true; } }); if (ailleurs(st.cours)) { st.cours = null; parti = true; if (st.ecran === 'tir') st.ecran = 'accueil'; } if (parti) saveLocal();
+    if (st.ecran === 'direct' || st.ecran === 'pas' || parti || (st.ecran === 'accueil' && av !== Object.keys(d).join())) render(); }).catch(function () {}); }
   function dirGo() { if (!HORS || dirT) return; fbDirect(); dirT = setInterval(function () { if (st.ecran !== 'direct') { clearInterval(dirT); dirT = null; return; } if (!document.hidden) { if (++st.dtic % 2 === 0) st.dper = (st.dper + 1) % 4; fbDirect(); fbSync(false); } }, 6000); }
+  setInterval(function () { if (st.ecran === 'tir' && st.cours && !document.hidden) vivre(); if (st.ecran === 'pas' && !document.hidden) fbDirect(); }, 60000); // signe de vie du téléphone qui note
   function pousser(col, id, body) { if (HORS) { fbSet(col, col === 'sessions' ? 'ses' : 'lic', id); return; } if (!db) return; db.collection(col).doc(id).set(body).catch(function () {}); }
   function retirer(col, id) { if (HORS) { fetch(FB + col + '/' + encodeURIComponent(id), { method: 'DELETE', headers: fbTete() }).catch(function () {}); if (col === 'licencies') fetch(FB + 'fiches/' + encodeURIComponent(id), { method: 'DELETE', headers: fbTete() }).catch(function () {}); return; } if (!db) return; db.collection(col).doc(id).delete().catch(function () {}); }
   function fusion(col, cle, snap, corps) {
@@ -434,7 +439,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   /* ---- actions ---- */
   function ajouterLic(nom) { nom = nom.trim().replace(/\s+/g, ' '); if (!nom) return; var id = slug(nom); if (st.lic[id]) return; st.lic[id] = { nom: nom }; saveLocal(); pousser('licencies', id, { nom: nom }); }
   function nouvellePlanche(disc, noms, pas) { var n = MAXT[disc], a = []; for (var i = 0; i < n; i++) a.push((noms && noms[i]) || ''); st.planche = { disc: disc, noms: a, memo: {}, pas: pas || '' }; st.msg = ''; st.ecran = 'planche'; }
-  function demarrer() {
+  function demarrer(attente) {
     var p = st.planche, tireurs = [], vus = {};
     for (var i = 0; i < p.noms.length; i++) {
       var nom = p.noms[i].trim().replace(/\s+/g, ' '); if (!nom) continue;
@@ -443,9 +448,10 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       tireurs.push({ nom: connu ? st.lic[id].nom : nom, statut: connu ? 'licencie' : 'invite' });
     }
     if (!tireurs.length) { st.msg = 'Inscrivez au moins un tireur.'; return render(); }
+    var nv = { id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), disc: p.disc, pas: p.pas || '', date: Date.now(), tireurs: tireurs, tirs: [], ack: 0 };
+    if (attente) { st.pauses[nv.id] = nv; saveLocal(); vivre(nv); st.pasVu = { disc: nv.disc, pas: nv.pas }; st.ecran = 'pas'; return render(); }
     if (st.cours) st.pauses[st.cours.id] = st.cours; // la planche déjà commencée est mise de côté, pas perdue
-    st.cours = { id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), disc: p.disc, pas: p.pas || '', date: Date.now(), tireurs: tireurs, tirs: [], ack: 0 };
-    saveLocal(); vivre(); st.ecran = 'tir'; render();
+    st.cours = nv; saveLocal(); vivre(); st.ecran = 'tir'; render();
   }
   function noter(r) {
     var s = st.cours; if (!s || etat(s).fini) return;
@@ -546,11 +552,6 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       '<g transform="translate(318 64) rotate(-16)"><g class="' + (heroAnim ? 'vol' : '') + '"><ellipse cx="0" cy="7" rx="44" ry="13" fill="#9c3306"/><ellipse cx="0" cy="0" rx="44" ry="13" fill="#ff6a1f"/><ellipse cx="0" cy="-3" rx="27" ry="7.5" fill="#ff8a4a"/><ellipse cx="0" cy="-5" rx="12" ry="3.2" fill="#ffc09a"/></g></g>' +
       '<g class="' + (heroAnim ? 'eclat' : '') + '" fill="#ffa24a"><path d="M262 120l13-5-3 12z"/><path d="M284 142l9 2-6 7z" opacity=".8"/><path d="M246 144l6-8 5 9z" opacity=".6"/></g>' +
       '</svg>' + p + '<button class="pin" data-pin="0" data-act="nouv" data-d="DTL" data-p="A">DTL<small>pas A</small></button><button class="pin bas" data-pin="1" data-act="nouv" data-d="FU" data-p="B">FU<small>fosse B</small></button><button class="pin" data-pin="2" data-act="nouv" data-d="DTL" data-p="C">DTL<small>pas C</small></button><button class="pin bas clair" data-pin="3" data-act="aller" data-e="' + (HORS && DIRECT_ON ? 'direct' : 'general') + '">Scores<small>club-house</small></button><span class="wm">BTC<em>GAS</em></span><span class="sub">Feuille de marque DTL · FU</span></div>'; heroAnim = false;
-    var PC = []; if (st.cours) PC.push([st.cours, 'ici']); Object.keys(st.pauses).forEach(function (id) { PC.push([st.pauses[id], 'pause']); });
-    if (HORS) Object.keys(st.direct || {}).forEach(function (id) { var d = st.direct[id]; if (!d || !d.tireurs || !d.tirs || (st.cours && st.cours.id === id) || st.pauses[id] || st.ses[id] || !(d.maj > Date.now() - 12 * 3600000) || d.tirs.length >= d.tireurs.length * NB) return; PC.push([Object.assign({ id: id }, d), 'autre']); });
-    if (PC.length) { PC.sort(function (p, q) { return q[0].date - p[0].date; }); h += '<div class="card"><h2>Planche' + (PC.length > 1 ? 's' : '') + ' en cours</h2>';
-      PC.forEach(function (x) { var c = x[0], e = etat(c); h += '<div class="item col"><span><b>' + c.disc + (c.pas ? ' · ' + (c.disc === 'FU' ? 'fosse ' : 'pas ') + c.pas : '') + '</b> · ' + fdate(c.date).slice(11) + (x[1] === 'autre' ? ' · <span class="muted">lancée sur un autre téléphone</span>' : '') + '<br><span class="small muted">' + esc(c.tireurs.map(function (t) { return nomCourt(t.nom); }).join(', ')) + ' · ' + e.n + ' tirs sur ' + e.total + '</span></span><span class="row"><button class="primary" data-act="reprendre" data-id="' + c.id + '">Reprendre</button><button data-act="abandon" data-id="' + c.id + '">Abandonner</button></span></div>'; });
-      h += '</div>'; }
     h += '<div class="stack"><div class="disc">' +
       '<button data-act="nouv" data-d="DTL"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M60 14L22 2"/><path d="M60 14V0"/><path d="M60 14L98 2"/></g><rect x="52" y="12" width="16" height="7" rx="2" fill="#ff6a1f"/><g fill="currentColor"><circle cx="16" cy="40" r="5"/><circle cx="38" cy="47" r="5"/><circle cx="60" cy="50" r="5"/><circle cx="82" cy="47" r="5"/><circle cx="104" cy="40" r="5"/></g></svg><b>DTL</b><span>5 tireurs, 5 plateaux par poste<br>3 pts / 2 pts / 0</span></button>' +
       '<button data-act="nouv" data-d="FU"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M16 14L4 0"/><path d="M38 14L46 0"/><path d="M60 14V0"/><path d="M82 14L72 0"/><path d="M104 14L116 0"/></g><g fill="#ff6a1f"><rect x="10" y="12" width="12" height="7" rx="2"/><rect x="32" y="12" width="12" height="7" rx="2"/><rect x="54" y="12" width="12" height="7" rx="2"/><rect x="76" y="12" width="12" height="7" rx="2"/><rect x="98" y="12" width="12" height="7" rx="2"/></g><g fill="currentColor"><circle cx="16" cy="48" r="5"/><circle cx="38" cy="48" r="5"/><circle cx="60" cy="48" r="5"/><circle cx="82" cy="48" r="5"/><circle cx="104" cy="48" r="5"/></g></svg><b>FU</b><span>Fosse universelle, 6 tireurs<br>1 pt par plateau cassé</span></button></div></div>';
@@ -572,7 +573,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     var dispo = noms.filter(function (n) { return !pris[slug(n)]; });
     if (dispo.length && dispo.length <= 40) h += '<div class="stack"><p class="small muted">Licenciés : touchez un nom pour l\'inscrire à la prochaine place libre.</p><div class="chips">' + dispo.map(function (n) { return '<button data-act="chip" data-n="' + esc(n) + '">' + esc(n) + '</button>'; }).join('') + '</div></div>';
     if (st.msg) h += '<p class="err">' + esc(st.msg) + '</p>';
-    h += '<button class="primary" data-act="demarrer">Démarrer la session</button>';
+    h += '<button class="primary" data-act="demarrer">Démarrer la session</button><button data-act="preparer">Préparer pour plus tard</button><p class="small muted">« Préparer pour plus tard » enregistre la planche au pas de tir : on la retrouve en touchant le pas de tir quand vient son tour.</p>';
     return h;
   }
   function vRotation(s, e) {
@@ -650,8 +651,32 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (non.length) h += '<div class="card"><h2>Pas encore classés</h2>' + non.map(ligne).join('') + '</div>';
     return h + '<p class="small muted">' + expl + '</p>';
   }
+  function enCoursAu(disc, pas) {
+    var L = [], now = Date.now(), vu = {}, bon = function (c) { return c && c.disc === disc && (c.pas || '') === (pas || ''); };
+    [st.cours].concat(Object.keys(st.pauses).map(function (id) { return st.pauses[id]; })).forEach(function (c) { if (bon(c) && !vu[c.id]) { vu[c.id] = 1; L.push({ s: c, e: 'moi' }); } });
+    if (HORS) Object.keys(st.direct || {}).forEach(function (id) { var d = st.direct[id]; if (vu[id] || st.ses[id] || !d || !d.tireurs || !d.tirs || !bon(d) || !(d.maj > now - 12 * 3600000) || d.tirs.length >= d.tireurs.length * NB) return; L.push({ s: Object.assign({ id: id }, d), e: d.tel === ME ? 'moi' : (d.tirs.length && d.maj > now - VERROU) ? 'occupe' : 'libre' }); });
+    return L.sort(function (p, q) { return p.s.date - q.s.date; });
+  }
+  function vPas() {
+    var v = st.pasVu || { disc: 'DTL', pas: '' }, L = enCoursAu(v.disc, v.pas), occ = L.some(function (x) { return x.e === 'occupe'; });
+    var h = entete(v.disc + (v.pas ? ' · ' + (v.disc === 'FU' ? 'fosse ' : 'pas ') + v.pas : ''), 'accueil');
+    if (!L.length) h += '<p class="muted">Aucune planche en cours ici.</p>';
+    L.forEach(function (x) { var c = x.s, e = etat(c);
+      h += '<div class="card"><h2>' + (e.n ? 'Planche en cours' : 'Planche prête') + '</h2><p><b>' + esc(c.tireurs.map(function (t) { return nomCourt(t.nom); }).join(', ')) + '</b><br><span class="small muted">' + (e.n ? 'Commencée à ' + fdate(c.date).slice(11) + ' · ' + e.n + ' tirs notés sur ' + e.total : 'Préparée à ' + fdate(c.date).slice(11) + ', pas encore commencée') + '</span></p>';
+      if (x.e === 'occupe') h += '<p class="muted">Notation en cours sur un autre téléphone : cette planche ne peut pas être reprise ici.</p>' + (DIRECT_ON ? '<button data-act="aller" data-e="direct">Suivre en direct</button>' : '');
+      else h += (x.e === 'libre' && e.n ? '<p class="small muted">Lancée sur un autre téléphone, sans activité depuis plus de ' + Math.round(VERROU / 60000) + ' minutes.</p>' : '') + '<div class="row"><button class="primary" style="flex:1" data-act="reprendre" data-id="' + c.id + '">' + (e.n ? 'Reprendre' + (x.e === 'libre' ? ' sur ce téléphone' : '') : 'Noter cette planche') + '</button><button style="flex:1" data-act="abandon" data-id="' + c.id + '">Abandonner</button></div>';
+      h += '</div>'; });
+    h += '<button class="' + (L.length ? 'ghost' : 'primary') + '" data-act="nouvforce">' + (L.length ? 'Préparer une autre planche' : 'Nouvelle planche') + '</button>';
+    return h;
+  }
+  function ouvrirPas(disc, pas) {
+    var suite = function () { if (enCoursAu(disc, pas).length) { st.pasVu = { disc: disc, pas: pas || '' }; st.ecran = 'pas'; } else nouvellePlanche(disc, null, pas); render(); window.scrollTo(0, 0); };
+    if (!HORS || !DIRECT_ON || navigator.onLine === false) return suite();
+    var fait = false, une = function () { if (!fait) { fait = true; suite(); } }; setTimeout(une, 2500);
+    fbListe('direct', '', {}).then(function (d) { st.direct = d; une(); }).catch(une);
+  }
   function vDirect() {
-    var now = Date.now(), ordre = { A: 1, B: 2, C: 3 }, L = Object.keys(st.direct || {}).map(function (id) { return st.direct[id]; }).filter(function (s) { return s && s.maj > now - 45 * 60000 && s.tireurs && s.tireurs.length && s.tirs && s.tirs.length < s.tireurs.length * NB; });
+    var now = Date.now(), ordre = { A: 1, B: 2, C: 3 }, L = Object.keys(st.direct || {}).map(function (id) { return st.direct[id]; }).filter(function (s) { return s && s.maj > now - 45 * 60000 && s.tireurs && s.tireurs.length && s.tirs && s.tirs.length && s.tirs.length < s.tireurs.length * NB; });
     L.sort(function (p, q) { return (ordre[p.pas] || 9) - (ordre[q.pas] || 9) || p.date - q.date; });
     var h = entete('Club-house', 'accueil');
     if (!HORS) return h + '<p class="muted">Cet écran fonctionne sur la version ouverte par le QR code.</p>';
@@ -728,7 +753,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     return h + '</div>';
   }
   function render() {
-    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral, direct: vDirect }[st.ecran] || vAccueil;
+    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral, direct: vDirect, pas: vPas }[st.ecran] || vAccueil;
     app.innerHTML = v(); app.classList.toggle('large', st.ecran === 'direct');
     if (st.ecran !== ecranVu) { ecranVu = st.ecran; app.classList.remove('in'); void app.offsetWidth; app.classList.add('in'); }
     hero3d(); syn3d();
@@ -1058,15 +1083,18 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       else { var nid = slug(o.nom); if (nid !== st.fiche && st.lic[nid]) st.msg = 'Un licencié porte déjà ce nom.';
         else { if (st.fiche && st.fiche !== nid) { delete st.lic[st.fiche]; retirer('licencies', st.fiche); } st.lic[nid] = o; saveLocal(); pousser('licencies', nid, corpsLic(o)); st.fiche = null; st.msg = ''; } }
     }
-    else if (a === 'nouv') nouvellePlanche(b.dataset.d, null, b.dataset.p);
+    else if (a === 'nouv') { ouvrirPas(b.dataset.d, b.dataset.p || ''); return; }
+    else if (a === 'nouvforce') { var pv0 = st.pasVu || {}; nouvellePlanche(pv0.disc || 'DTL', null, pv0.pas); }
     else if (a === 'chip') { var p = st.planche, j = p.noms.findIndex(function (n) { return !n.trim(); }); if (j >= 0) p.noms[j] = b.dataset.n; }
     else if (a === 'demarrer') return demarrer();
+    else if (a === 'preparer') return demarrer(true);
     else if (a === 'noter') return noter(+b.dataset.r);
     else if (a === 'annuler') { s = st.cours; if (s && s.tirs.length) { if (SY) SY.stop(); s.tirs.pop(); s.ack = 0; if (etat(s).rotation) s.ack = s.tirs.length; saveLocal(); vivre(); } }
     else if (a === 'pret') { st.cours.ack = st.cours.tirs.length; saveLocal(); }
     else if (a === 'abandon') { var ai = b.dataset.id || (st.cours && st.cours.id); if (ai) { mort(ai); if (st.cours && st.cours.id === ai) st.cours = null; delete st.pauses[ai]; if (st.direct) delete st.direct[ai]; saveLocal(); } }
-    else if (a === 'reprendre') { var ri = b.dataset.id, rs = (st.cours && st.cours.id === ri) ? st.cours : st.pauses[ri] || (st.direct && st.direct[ri] ? { id: ri, disc: st.direct[ri].disc, pas: st.direct[ri].pas || '', date: st.direct[ri].date, tireurs: st.direct[ri].tireurs, tirs: st.direct[ri].tirs.slice(), ack: st.direct[ri].tirs.length } : null);
-      if (rs) { if (st.cours && st.cours.id !== ri) st.pauses[st.cours.id] = st.cours; delete st.pauses[ri]; st.cours = rs; if (rs.ack === undefined) rs.ack = 0; saveLocal(); vivre(); st.ecran = 'tir'; window.scrollTo(0, 0); } }
+    else if (a === 'reprendre') { var ri = b.dataset.id, dr = st.direct && st.direct[ri], pris = dr && dr.tel && dr.tel !== ME && dr.tirs && dr.tirs.length && dr.maj > Date.now() - VERROU, rs = pris ? null : (st.cours && st.cours.id === ri) ? st.cours : st.pauses[ri] || (st.direct && st.direct[ri] ? { id: ri, disc: st.direct[ri].disc, pas: st.direct[ri].pas || '', date: st.direct[ri].date, tireurs: st.direct[ri].tireurs, tirs: st.direct[ri].tirs.slice(), ack: st.direct[ri].tirs.length } : null);
+      if (rs) { if (st.cours && st.cours.id !== ri) st.pauses[st.cours.id] = st.cours; delete st.pauses[ri]; st.cours = rs; rs.pris = Date.now(); if (rs.ack === undefined) rs.ack = 0; saveLocal(); vivre(); st.ecran = 'tir'; window.scrollTo(0, 0); } }
+    else if (0) {}
     else if (a === 'voir') { st.retour = st.ecran === 'direct' ? 'direct' : st.ecran === 'historique' ? 'historique' : 'accueil'; st.vue = b.dataset.id; st.copie = ''; st.msg = ''; st.ecran = 'resultat'; }
     else if (a === 'suppr' || a === 'dellic') st.suppr = b.dataset.id;
         else if (a === 'dellicOk') { delete st.lic[b.dataset.id]; saveLocal(); retirer('licencies', b.dataset.id); }
