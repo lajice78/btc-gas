@@ -66,6 +66,8 @@ button:disabled{opacity:.4;cursor:default}
 .disc span{font-size:13.5px;font-weight:500;color:var(--muted);line-height:1.35}
 input[type=text]{font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:14px;padding:12px 14px;width:100%;min-height:52px}
 input[type=text]::placeholder{color:var(--muted);opacity:.75}
+select.fsel{font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:18px;padding:12px 14px;width:100%;min-height:52px;-webkit-appearance:none;appearance:none}
+select.fsel option{color:#111;background:#fff}
 input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
 .slot{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center}
 .slot .n{font-family:var(--display);font-weight:800;font-size:24px;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--surface2);border:2px solid var(--accent);color:var(--ink)}
@@ -231,6 +233,8 @@ input[type=password],input[type=tel],input[type=email]{font:inherit;color:var(--
 .syn.on{display:block}
 .syn.on + .postes{display:none}
 .syn canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.syn .hud{position:absolute;right:10px;top:10px;z-index:2;display:flex;align-items:baseline;gap:5px;padding:6px 12px;border-radius:16px;background:rgba(4,12,9,.62);color:#f5f7f2;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.syn .hud b{font-size:22px;font-weight:800;line-height:1;color:#ffb36b}.syn .hud b.ko{color:#ff8f88}.syn .hud small{font-size:11px;text-transform:uppercase;letter-spacing:.6px;opacity:.85}.syn .hud i{width:1px;height:16px;background:rgba(255,255,255,.3);margin:0 5px;align-self:center}
 .syn .cap{position:absolute;left:12px;top:10px;z-index:1;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:99px;background:rgba(4,12,9,.55);color:#f5f7f2}
 .syn .cap:empty{display:none}
 
@@ -507,10 +511,33 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     AVO.forEach(function (k) { h += '<p class="small muted" style="margin:6px 0 2px">' + AVN[k] + '</p><div class="avl">' + AVP[k].map(function (v, n) { var on = a[k] === n; if (AVT[k]) return '<button class="avt' + (on ? ' on' : '') + '" data-act="av" data-o="' + k + '" data-v="' + n + '">' + AVT[k][n] + '</button>'; return v < 0 ? '<button class="avt' + (on ? ' on' : '') + '" data-act="av" data-o="' + k + '" data-v="' + n + '">' + (k === 'h' ? 'Chauve' : k === 'k' ? 'Bouchons' : 'Sans') + '</button>' : '<button class="avc' + (on ? ' on' : '') + '" style="background:' + hx(v) + '" data-act="av" data-o="' + k + '" data-v="' + n + '" aria-label="' + AVN[k] + ' ' + (n + 1) + '"></button>'; }).join('') + '</div>'; });
     return h + '<p class="small muted">Votre avatar vous représente sur le pas de tir et sur le podium, sur tous les téléphones et à l\'écran du club-house.</p>';
   }
+  // cartouches tirées par un tireur : 1 pour un plateau cassé au 1er coup, 2 sinon (2e coup ou raté)
+  function cartouches(k) {
+    var d = new Date(), j0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(), m0 = new Date(d.getFullYear(), d.getMonth(), 1).getTime(), a0 = new Date(d.getFullYear(), 0, 1).getTime(), o = { jour: 0, mois: 0, an: 0, tout: 0 };
+    Object.keys(st.ses).forEach(function (id) { var s = st.ses[id]; bilan(s).forEach(function (x) { if (slug(x.nom) !== k) return; var n = 0; x.marks.forEach(function (r) { if (r !== null) n += r === 1 ? 1 : 2; }); o.tout += n; if (s.date >= a0) o.an += n; if (s.date >= m0) o.mois += n; if (s.date >= j0) o.jour += n; }); });
+    return o;
+  }
+  function cartHtml(k, ajust) {
+    var c = cartouches(k), sp = function (n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }, kp = function (v, l) { return '<div class="kpi"><b>' + sp(v) + '</b><span>' + l + '</span></div>'; };
+    return '<div class="stat3">' + kp(c.jour, 'aujourd\'hui') + kp(c.mois, 'ce mois') + kp(c.an, 'cette année') + kp(Math.max(0, c.tout + (ajust || 0)), 'au total') + '</div>';
+  }
+  // fusils de ball-trap : grandes marques et leurs modèles superposés les plus répandus (« Autre » reste toujours possible)
+  var FUS = { 'Beretta': ['686 Silver Pigeon I', '687 Silver Pigeon III', '690', '692', '694', 'DT11', 'SL3', 'Ultraleggero'], 'Browning': ['B525', 'B725', 'B725 Pro Trap', 'B725 Pro Sport', 'Citori', 'Ultra XS', 'Cynergy', 'B15', 'B25'], 'Perazzi': ['MX8', 'MX12', 'MX2000', 'MX2000S', 'High Tech', 'TM1'], 'Krieghoff': ['K-80', 'K-20'], 'Blaser': ['F3', 'F16', 'FBT'], 'Caesar Guerini': ['Summit', 'Invictus', 'Tempio', 'Magnus', 'Ellipse'], 'Miroku': ['MK38', 'MK60', 'MK70', 'MK11'], 'Winchester': ['Select', '101'], 'Fabarm': ['Elos', 'Axis'], 'Zoli': ['Z-Sport', 'Kronos', 'Z-Gun'], 'Rizzini': ['BR110', 'BR460', 'Vertex', 'Artemis', 'S2000'], 'Benelli': ['828U'], 'Bettinsoli': ['Diamond', 'X-Trail', 'Omega'], 'Franchi': ['Feeling', 'Instinct'], 'FAIR': ['Carrera', 'Jubilee', 'Racing'], 'Kemen': ['KM4'], 'Verney-Carron': ['Sagittaire', 'Vercar'], 'Yildiz': ['Pro', 'SPZ ME'], 'ATA': ['SP'] };
+  var FOPT = { ty: ['Type', ['Superposé', 'Juxtaposé', 'Monocanon']], ca: ['Calibre', ['12', '16', '20', '28', '.410']], lc: ['Longueur des canons', ['66 cm', '71 cm', '76 cm', '81 cm', '86 cm']], cb: ['Choke du 1er coup', ['Cylindrique', '1/4', '1/2', '3/4', 'Full']], ch: ['Choke du 2e coup', ['Cylindrique', '1/4', '1/2', '3/4', 'Full']] };
+  function fSel(id, L, v, vide) { return '<select id="' + id + '" class="fsel"><option value="">' + vide + '</option>' + L.map(function (x) { return '<option' + (x === v ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select>'; }
+  function vFusil() {
+    if (!st.membre) return vMembre(); var f = st.membre.fusil || {}, lab = function (t) { return '<p class="small muted" style="margin:8px 0 2px">' + t + '</p>'; }, marques = Object.keys(FUS).sort(), autreM = f.m && !FUS[f.m], mods = FUS[f.m] || [], autreMo = f.mo && mods.indexOf(f.mo) < 0;
+    var h = entete('Mon fusil', 'membre') + '<div class="card"><h2>' + esc(st.membre.nom) + '</h2>' + lab('Marque') + fSel('fmarque', marques.concat(['Autre']), autreM ? 'Autre' : (f.m || ''), 'Choisir une marque') + (autreM || f.mAutre ? '<input type="text" id="fmarqueA" style="margin-top:6px" autocomplete="off" maxlength="30" placeholder="Nom de la marque" value="' + esc(autreM ? f.m : '') + '">' : '');
+    h += lab('Modèle') + (mods.length ? fSel('fmodele', mods.concat(['Autre']), autreMo ? 'Autre' : (f.mo || ''), 'Choisir un modèle') : '') + (!mods.length || autreMo || f.moAutre ? '<input type="text" id="fmodeleA" style="margin-top:6px" autocomplete="off" maxlength="40" placeholder="Nom du modèle" value="' + esc(autreMo || !mods.length ? (f.mo || '') : '') + '">' : '');
+    Object.keys(FOPT).forEach(function (o) { h += lab(FOPT[o][0]) + fSel('fo_' + o, FOPT[o][1], f[o] || '', 'Non précisé'); });
+    h += '<p class="small muted">Ces informations restent sur ce téléphone.</p></div>';
+    var c = cartouches(st.membre.k), tot = Math.max(0, c.tout + (f.adj || 0));
+    return h + '<div class="card"><h2>Cartouches tirées' + (f.m ? ' · ' + esc(f.m) + (f.mo ? ' ' + esc(f.mo) : '') : '') + '</h2><div id="fcart">' + cartHtml(st.membre.k, f.adj) + '</div>' + lab('Total au compteur, à corriger à la main si besoin') + '<input type="text" inputmode="numeric" id="ftotal" autocomplete="off" maxlength="7" value="' + tot + '"><p class="small muted">L\'appli compte d\'après vos feuilles : 1 cartouche pour un plateau cassé au 1er coup, 2 pour un 2e coup ou un raté. Saisissez le vrai total de votre fusil (cartouches tirées ailleurs ou avant l\'appli comprises) : le compteur repart de ce chiffre.</p></div>';
+  }
   function vAvatar() { if (!st.membre) return vMembre(); return entete('Mon avatar', 'membre') + '<div class="card">' + avEdit() + '</div>'; }
   function vMembre() {
     var h = entete('Espace membre', 'accueil');
-    if (st.membre) return h + '<div class="card"><h2>' + esc(st.membre.nom) + '</h2><p class="muted">Vous êtes connecté sur ce téléphone.</p><button class="primary" data-act="tireur" data-k="' + st.membre.k + '">Mes statistiques</button>' + (window.THREE ? '<button data-act="aller" data-e="avatar">Mon avatar</button>' : '') + '<button class="ghost" data-act="membreout">Me déconnecter</button></div>';
+    if (st.membre) return h + '<div class="card"><h2>' + esc(st.membre.nom) + '</h2><p class="muted">Vous êtes connecté sur ce téléphone.</p><button class="primary" data-act="tireur" data-k="' + st.membre.k + '">Mes statistiques</button>' + (window.THREE ? '<button data-act="aller" data-e="avatar">Mon avatar</button>' : '') + '<button data-act="aller" data-e="fusil">Mon fusil</button>' + '<button class="ghost" data-act="membreout">Me déconnecter</button></div>';
     var noms = licNoms();
     return h + '<div class="card"><h2>Connexion</h2><p class="muted">' + (st.apres ? 'Il faut être connecté pour noter une planche. ' : '') + 'Saisissez le code du club, puis choisissez votre nom.</p><input type="password" id="mcode" autocomplete="off" placeholder="Code du club"><input type="text" id="mnom" list="dl-mb" autocomplete="off" placeholder="Votre nom"><datalist id="dl-mb">' + noms.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist><button class="primary" data-act="membrein">Me connecter</button>' + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '') + '</div>';
   }
@@ -794,7 +821,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     var d = s.disc === 'DTL';
     var h = entete(s.disc + ' ' + (e.k + 1) + '/25', 'accueil') + (s.num ? '<p class="small muted" style="margin:-8px 0 0">' + numTxt(s) + '</p>' : '') + '<div class="tirv">' + voixSw() + '<div class="prog"><i style="width:' + Math.round(100 * e.n / e.total) + '%"></i></div>';
     var occ = {}; for (var q = 0; q < N; q++) { var ii = (e.i + q) % N, kk = (!d && ii < e.i) ? e.k + 1 : e.k; if (kk < NB) { var pp = posteDe(s.disc, ii, kk); if (!occ[pp]) occ[pp] = ii + 1; } }
-    h += '<div class="syn"><span class="cap"></span></div>';
+    var bj = bilan(s)[e.i], rj = bj.marks.filter(function (r) { return r === 0; }).length;
+    h += '<div class="syn"><span class="cap"></span><div class="hud"><b>' + bj.total + '</b><small>point' + (bj.total > 1 ? 's' : '') + '</small><i></i><b class="ko">' + rj + '</b><small>raté' + (rj > 1 ? 's' : '') + '</small></div></div>';
     h += '<div class="postes">' + [1, 2, 3, 4, 5].map(function (pn) { return '<div class="po' + (pn === e.poste ? ' act' : '') + (occ[pn] ? '' : ' vide') + '"><b>' + (occ[pn] || '') + '</b><span>P' + pn + '</span></div>'; }).join('') + '</div>';
     h += '<div class="now"><span class="poste">Poste ' + e.poste + (d ? ' · tir ' + (e.k % 5 + 1) + ' sur 5' : '') + '</span><span class="nom">' + esc(s.tireurs[e.i].nom) + '</span><span class="ctx">Tireur ' + (e.i + 1) + ' · plateau ' + (e.k + 1) + ' sur 25 · ' + b[e.i].total + ' pt' + (b[e.i].total > 1 ? 's' : '') + '</span></div>';
     h += '<div class="shots"><button class="s1" data-act="noter" data-r="1"><span><i class="carts"><i class="cart"></i></i>Cassé au 1er coup</span><b>' + (d ? '3' : '1') + '</b></button><button class="s2" data-act="noter" data-r="2"><span><i class="carts"><i class="cart"></i><i class="cart"></i></i>Cassé au 2e coup</span><b>' + (d ? '2' : '1') + '</b></button><button class="s0" data-act="noter" data-r="0"><span><i class="miss"></i>' + (d ? 'Raté' : 'Zéro') + '</span><b>0</b></button></div>';
@@ -917,7 +945,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       corps += '<div class="card"><h2>Par poste ' + dc + '</h2><p class="small muted">Réussite moyenne à chaque poste, en % des points possibles.</p><div class="barres" style="margin-top:18px">' + po.map(function (v, i) { var pc = pn[i] ? Math.round(100 * v / (pn[i] * ptMax)) : 0; return '<i style="height:' + Math.max(4, pc) + '%"><span>' + pc + '%</span></i>'; }).join('') + '</div><div style="display:flex;gap:5px;text-align:center" class="small muted">' + po.map(function (v, i) { return '<span style="flex:1">P' + (i + 1) + '</span>'; }).join('') + '</div>' + txtF + '</div>';
       corps += '<div class="card"><h2>Séries ' + dc + '</h2>' + L.slice().reverse().slice(0, 15).map(function (e) { return '<div class="item clic" role="button" tabindex="0" data-act="voir" data-id="' + e.id + '"><span>' + fdate(e.d) + (e.num ? ' · ' + numAff(e.num) : '') + '</span><b>' + e.t + '/' + mx + '</b></div>'; }).join('') + '</div>';
     });
-    h = entete(esc(nom || 'Tireur'), st.retourT || 'general');
+    h = entete(esc(nom || 'Tireur'), st.retourT || 'general'); if (corps) corps += '<div class="card"><h2>Cartouches tirées</h2>' + cartHtml(k, st.membre && st.membre.k === k && st.membre.fusil ? st.membre.fusil.adj : 0) + '</div>';
     return h + (corps || '<p class="muted">Aucune série enregistrée pour ce tireur.</p>');
   }
   function vDirect() {
@@ -1021,7 +1049,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) veille(); });
   function render() {
-    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral, direct: vDirect, pas: vPas, tireur: vTireur, membre: vMembre, avatar: vAvatar, concours: vConcours, conc: vConc, securite: vSecu }[st.ecran] || vAccueil;
+    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral, direct: vDirect, pas: vPas, tireur: vTireur, membre: vMembre, avatar: vAvatar, fusil: vFusil, concours: vConcours, conc: vConc, securite: vSecu }[st.ecran] || vAccueil;
     app.innerHTML = v(); app.classList.toggle('large', st.ecran === 'direct'); veille();
     if (st.ecran !== ecranVu) { ecranVu = st.ecran; app.classList.remove('in'); void app.offsetWidth; app.classList.add('in'); }
     hero3d(); syn3d();
@@ -1389,6 +1417,15 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   /* ---- évènements ---- */
   app.addEventListener('input', function (ev) {
     var t = ev.target;
+    if (st.membre && st.ecran === 'fusil' && t.id && t.id.charAt(0) === 'f') { var fu = st.membre.fusil || (st.membre.fusil = {}), redess = false;
+      if (t.id === 'fmarque') { fu.mAutre = t.value === 'Autre'; fu.m = fu.mAutre ? '' : t.value; fu.mo = ''; fu.moAutre = false; redess = true; }
+      else if (t.id === 'fmarqueA') fu.m = t.value.trim().slice(0, 30);
+      else if (t.id === 'fmodele') { fu.moAutre = t.value === 'Autre'; fu.mo = fu.moAutre ? '' : t.value; redess = true; }
+      else if (t.id === 'fmodeleA') fu.mo = t.value.trim().slice(0, 40);
+      else if (t.id.indexOf('fo_') === 0) fu[t.id.slice(3)] = t.value;
+      else if (t.id === 'ftotal') { fu.adj = (parseInt(t.value.replace(/\D/g, ''), 10) || 0) - cartouches(st.membre.k).tout; var fc = document.getElementById('fcart'); if (fc) fc.innerHTML = cartHtml(st.membre.k, fu.adj); }
+      else return;
+      lset('btc.membre', st.membre); var FM = lget('btc.fusils', {}); FM[st.membre.k] = fu; lset('btc.fusils', FM); if (redess) render(); return; }
     if (t.dataset.slot !== undefined) { var i = +t.dataset.slot; st.planche.noms[i] = t.value; var m = document.getElementById('memo' + i); if (m) m.hidden = !(t.value.trim() && !st.lic[slug(t.value)]); }
     if (t.dataset.memo !== undefined) st.planche.memo[+t.dataset.memo] = t.checked;
   });
@@ -1439,7 +1476,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       else if (Object.keys(st.lic).length && !st.lic[mk]) { st.msg = 'Ce nom n\'est pas dans la liste des licenciés. Choisissez-le dans la liste ou voyez l\'administrateur.'; }
       else { b.disabled = true; b.textContent = 'Connexion…'; fbAuth('signInWithPassword', mc, MEMBRE_MAIL).then(function (r) {
           if (!r.ok) { st.msg = navigator.onLine === false ? 'Pas de réseau : connexion impossible.' : 'Code du club incorrect.'; return render(); }
-          jetonM = r.j.idToken; st.membre = { nom: st.lic[mk] ? st.lic[mk].nom : mn, k: mk, rt: r.j.refreshToken }; lset('btc.membre', st.membre); st.msg = '';
+          jetonM = r.j.idToken; st.membre = { nom: st.lic[mk] ? st.lic[mk].nom : mn, k: mk, rt: r.j.refreshToken, fusil: lget('btc.fusils', {})[mk] }; lset('btc.membre', st.membre); st.msg = '';
           var ap = st.apres; st.apres = null; if (ap) ouvrirPas(ap.disc, ap.pas); else { st.ecran = 'membre'; render(); }
         }, function () { st.msg = 'Connexion impossible.'; render(); }); return; }
     }
