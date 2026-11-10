@@ -503,13 +503,14 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function avEdit() {
     if (!window.THREE) return '';
     var a = avLire(st.membre.av || st.av[st.membre.k], 0), hx = function (n) { return '#' + ('000000' + n.toString(16)).slice(-6); };
-    var h = '<h2 style="margin-top:8px">Mon avatar</h2><div class="syn av"><span class="cap"></span></div>';
+    var h = '<h2>' + esc(st.membre.nom) + '</h2><div class="syn av"><span class="cap"></span></div>';
     AVO.forEach(function (k) { h += '<p class="small muted" style="margin:6px 0 2px">' + AVN[k] + '</p><div class="avl">' + AVP[k].map(function (v, n) { var on = a[k] === n; if (AVT[k]) return '<button class="avt' + (on ? ' on' : '') + '" data-act="av" data-o="' + k + '" data-v="' + n + '">' + AVT[k][n] + '</button>'; return v < 0 ? '<button class="avt' + (on ? ' on' : '') + '" data-act="av" data-o="' + k + '" data-v="' + n + '">' + (k === 'h' ? 'Chauve' : k === 'k' ? 'Bouchons' : 'Sans') + '</button>' : '<button class="avc' + (on ? ' on' : '') + '" style="background:' + hx(v) + '" data-act="av" data-o="' + k + '" data-v="' + n + '" aria-label="' + AVN[k] + ' ' + (n + 1) + '"></button>'; }).join('') + '</div>'; });
     return h + '<p class="small muted">Votre avatar vous représente sur le pas de tir et sur le podium, sur tous les téléphones et à l\'écran du club-house.</p>';
   }
+  function vAvatar() { if (!st.membre) return vMembre(); return entete('Mon avatar', 'membre') + '<div class="card">' + avEdit() + '</div>'; }
   function vMembre() {
     var h = entete('Espace membre', 'accueil');
-    if (st.membre) return h + '<div class="card"><h2>' + esc(st.membre.nom) + '</h2><p class="muted">Vous êtes connecté sur ce téléphone.</p>' + avEdit() + '<button class="primary" data-act="tireur" data-k="' + st.membre.k + '">Mes statistiques</button><button class="ghost" data-act="membreout">Me déconnecter</button></div>';
+    if (st.membre) return h + '<div class="card"><h2>' + esc(st.membre.nom) + '</h2><p class="muted">Vous êtes connecté sur ce téléphone.</p><button class="primary" data-act="tireur" data-k="' + st.membre.k + '">Mes statistiques</button>' + (window.THREE ? '<button data-act="aller" data-e="avatar">Mon avatar</button>' : '') + '<button class="ghost" data-act="membreout">Me déconnecter</button></div>';
     var noms = licNoms();
     return h + '<div class="card"><h2>Connexion</h2><p class="muted">' + (st.apres ? 'Il faut être connecté pour noter une planche. ' : '') + 'Saisissez le code du club, puis choisissez votre nom.</p><input type="password" id="mcode" autocomplete="off" placeholder="Code du club"><input type="text" id="mnom" list="dl-mb" autocomplete="off" placeholder="Votre nom"><datalist id="dl-mb">' + noms.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist><button class="primary" data-act="membrein">Me connecter</button>' + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '') + '</div>';
   }
@@ -647,7 +648,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function avLire(txt, i) { var d = avDef(i).split('.'), t = String(txt || '').split('.'), o = {}; AVO.forEach(function (k, n) { var v = parseInt(t[n], 10); o[k] = (v >= 0 && v < AVP[k].length) ? v : +d[n]; }); return o; }
   function avTxt(o) { return AVO.map(function (k) { return o[k]; }).join('.'); }
   st.av = lget('btc.av', {}); var avT = null;
-  function fbAv() { if (!HORS) return; fbListe('avatars', '', {}).then(function (d) { var o = {}; Object.keys(d).forEach(function (k) { if (d[k] && d[k].a) o[k] = String(d[k].a).slice(0, 40); }); if (avT && st.membre && st.membre.av) o[st.membre.k] = st.membre.av; st.av = o; lset('btc.av', o); if (st.membre && !avT && o[st.membre.k] && o[st.membre.k] !== st.membre.av) { st.membre.av = o[st.membre.k]; lset('btc.membre', st.membre); if (st.ecran === 'membre') render(); } }).catch(function () {}); }
+  function fbAv() { if (!HORS) return; fbListe('avatars', '', {}).then(function (d) { var o = {}; Object.keys(d).forEach(function (k) { if (d[k] && d[k].a) o[k] = String(d[k].a).slice(0, 40); }); if (avT && st.membre && st.membre.av) o[st.membre.k] = st.membre.av; st.av = o; lset('btc.av', o); if (st.membre && !avT && o[st.membre.k] && o[st.membre.k] !== st.membre.av) { st.membre.av = o[st.membre.k]; lset('btc.membre', st.membre); if (st.ecran === 'avatar') render(); } }).catch(function () {}); }
   function avEnvoi() { avT = null; if (!HORS || !st.membre || !st.membre.av) return; fetch(FB + 'avatars/' + encodeURIComponent(st.membre.k), { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: { a: { stringValue: st.membre.av } } }) }).catch(function () {}); }
   // voix : annonces parlées par le téléphone (synthèse vocale intégrée), coupées par défaut
   st.voix = lget('btc.voix', false);
@@ -1020,7 +1021,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) veille(); });
   function render() {
-    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral, direct: vDirect, pas: vPas, tireur: vTireur, membre: vMembre, concours: vConcours, conc: vConc, securite: vSecu }[st.ecran] || vAccueil;
+    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral, direct: vDirect, pas: vPas, tireur: vTireur, membre: vMembre, avatar: vAvatar, concours: vConcours, conc: vConc, securite: vSecu }[st.ecran] || vAccueil;
     app.innerHTML = v(); app.classList.toggle('large', st.ecran === 'direct'); veille();
     if (st.ecran !== ecranVu) { ecranVu = st.ecran; app.classList.remove('in'); void app.offsetWidth; app.classList.add('in'); }
     hero3d(); syn3d();
@@ -1349,7 +1350,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     };
   }
   function syn3d() {
-    var box = document.querySelector('.syn'), fin = st.ecran === 'resultat' ? st.ses[st.vue] : null, s = fin || st.cours, ap = st.ecran === 'membre' && st.membre; if (!box || (!s && !ap) || !window.THREE) return;
+    var box = document.querySelector('.syn'), fin = st.ecran === 'resultat' ? st.ses[st.vue] : null, s = fin || st.cours, ap = st.ecran === 'avatar' && st.membre; if (!box || (!s && !ap) || !window.THREE) return;
     var avs = function (q) { return q.tireurs.map(function (t) { return st.av[slug(t.nom)] || ''; }); };
     try {
       if (!SY) SY = creerSyn();
