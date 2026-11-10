@@ -322,6 +322,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
 <script>
 (function () {
   var CLUB = 'BTC GAS';
+  var DEMO = true; // feuilles de démonstration (identifiants « demo… ») : passer à false pour les masquer partout
+  function ecarte(id, date) { return /^demo/.test(id) ? !DEMO : !(date >= PURGE); }
   var PURGE = 1794306349000; // les feuilles d'essai antérieures à cette date sont écartées
   var CLUB_PASS = '0000'; // mot de passe provisoire de l'espace club
   var CLUB_MAIL = ''; // adresse de la boîte du club (à renseigner)
@@ -339,7 +341,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   st.skin = lget('btc.skin2', 'sombre');
   function peau() { document.documentElement.classList.toggle('clair', st.skin !== 'sombre'); }
   peau();
-  Object.keys(st.ses).forEach(function (id) { if (!(st.ses[id].date >= PURGE)) delete st.ses[id]; });
+  Object.keys(st.ses).forEach(function (id) { if (ecarte(id, st.ses[id].date)) delete st.ses[id]; });
   if (st.cours && !(st.cours.date >= PURGE)) st.cours = null;
   function saveLocal() { lset('btc.lic', st.lic); lset('btc.ses', st.ses); lset('btc.cours', st.cours); lset('btc.pauses', st.pauses || {}); }
 
@@ -386,7 +388,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     Promise.all([fbListe('sessions', '', {}), fbListe('licencies', '', {})]).then(function (res) {
       [['sessions', 'ses', res[0]], ['licencies', 'lic', res[1]]].forEach(function (t) {
         var col = t[0], cle = t[1], dist = t[2], loc = st[cle];
-        Object.keys(dist).forEach(function (id) { if (col === 'sessions' && !(dist[id].date >= PURGE)) { delete dist[id]; delete loc[id]; return; } if (loc[id] && loc[id]._d) { fbSet(col, cle, id); return; } loc[id] = Object.assign(col === 'licencies' ? (loc[id] || {}) : {}, dist[id], { _s: 1 }); if (col === 'sessions') loc[id].id = id; });
+        Object.keys(dist).forEach(function (id) { if (col === 'sessions' && ecarte(id, dist[id].date)) { delete dist[id]; delete loc[id]; return; } if (loc[id] && loc[id]._d) { fbSet(col, cle, id); return; } loc[id] = Object.assign(col === 'licencies' ? (loc[id] || {}) : {}, dist[id], { _s: 1 }); if (col === 'sessions') loc[id].id = id; });
         Object.keys(loc).forEach(function (id) { if (dist[id]) return; if (loc[id]._s && !loc[id]._d) delete loc[id]; /* déjà envoyé puis retiré par l'administrateur */ else if (col === 'sessions' || jeton) fbSet(col, cle, id); });
       });
       fbVu = Date.now(); fbCours = false; sync = 'ok'; saveLocal(); if (st.ecran !== 'tir' && st.ecran !== 'planche' && st.ecran !== 'club') render();
