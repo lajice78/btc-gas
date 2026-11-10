@@ -1,5 +1,5 @@
 // BTC GAS : fonctionne sans réseau au stand. Réseau d'abord pour la page (mises à jour), cache en secours.
-var C = 'btc-gas-v9';
+var C = 'btc-gas-v11';
 self.addEventListener('install', function (e) { e.waitUntil(caches.open(C).then(function (c) { return c.addAll(['./', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png']); })); self.skipWaiting(); });
 self.addEventListener('activate', function (e) { e.waitUntil(caches.keys().then(function (k) { return Promise.all(k.filter(function (n) { return n !== C; }).map(function (n) { return caches.delete(n); })); })); self.clients.claim(); });
 self.addEventListener('fetch', function (e) {

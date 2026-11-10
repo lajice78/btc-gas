@@ -225,7 +225,7 @@ input[type=text]{border-radius:18px}
 input[type=password],input[type=tel],input[type=email]{font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:18px;padding:12px 14px;width:100%;min-height:52px}
 .champ{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.3px}
 /* synoptique 3D du pas de tir */
-.syn{display:none;position:relative;height:215px;border-radius:26px;overflow:hidden;border:1px solid var(--panel-line);background:linear-gradient(180deg,#16483a 0%,#0d2c22 60%,#0a2219 100%);box-shadow:0 18px 44px var(--shadow)}
+.syn{display:none;position:relative;height:clamp(230px,36vh,300px);border-radius:26px;overflow:hidden;border:1px solid var(--panel-line);background:linear-gradient(180deg,#6fb2e6 0%,#bfe0f5 48%,#e6f3fa 100%);box-shadow:0 18px 44px var(--shadow)}
 .syn.on{display:block}
 .syn.on + .postes{display:none}
 .syn canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
@@ -524,9 +524,10 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function vResultat() {
     var s = st.ses[st.vue]; if (!s) return vAccueil();
     var c = classement(s), d = s.disc === 'DTL', mx = maxPts(s.disc);
-    var h = entete('Résultat ' + s.disc, 'accueil') + '<p class="muted">' + fdate(s.date) + '</p><div class="card"><h2>Classement</h2>';
+    var h = entete('Résultat ' + s.disc, 'accueil') + '<p class="muted">' + fdate(s.date) + '</p><div class="syn"><span class="cap"></span></div><div class="card"><h2>Classement</h2>';
     c.forEach(function (x) { h += '<div class="rank' + (x.rang === 1 ? ' first' : '') + '"><span class="rg">' + x.rang + '</span><span><b>' + esc(x.nom) + '</b><br><span class="small muted">' + (d ? x.casses + '/25 cassés, ' : '') + x.premier + ' au 1er coup' + (s.tireurs[x.i].statut === 'invite' ? ' · invité' : '') + (x.exaequo ? ' · ex æquo, barrage' : '') + '</span></span><span class="sc">' + x.total + '<small>/' + mx + '</small></span></div>'; });
-    h += '</div><div class="row" style="justify-content:space-between"><h2>Grille de marque</h2><button class="ghost" data-act="edit">' + (st.edit ? 'Terminer la correction' : 'Corriger un tir') + '</button></div>';
+    h += '</div><div class="row" style="justify-content:space-between"><h2>Grille de marque</h2>' + (st.clubOk ? '<button class="ghost" data-act="edit">' + (st.edit ? 'Terminer la correction' : 'Corriger un tir') + '</button>' : '') + '</div>';
+    if (!st.clubOk) st.edit = false;
     if (st.edit) h += '<p class="small muted">Touchez une case pour changer sa valeur : 1er coup, 2e coup, zéro.</p>';
     bilan(s).forEach(function (x) {
       h += '<div class="card' + (st.edit ? ' edit' : '') + '"><div class="row" style="justify-content:space-between"><b>' + (x.i + 1) + '. ' + esc(x.nom) + '</b><b>' + x.total + '/' + mx + '</b></div><div class="grid5">';
@@ -540,7 +541,9 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (dl || HORS) h += '<div class="row"><button data-act="png" style="flex:1">Télécharger l\'image</button><button data-act="csv" style="flex:1">Télécharger le tableau (CSV)</button></div>';
     if (st.copie) h += '<p class="small muted">' + esc(st.copie) + '</p><textarea id="txt" readonly>' + esc(resume(s)) + '</textarea>';
     if (st.msg) h += '<p class="err">' + esc(st.msg) + '</p>';
-    h += '<button data-act="rejouer">Nouvelle planche avec les mêmes tireurs</button></div>';
+    h += '<button data-act="rejouer">Nouvelle planche avec les mêmes tireurs</button>';
+    if (st.clubOk) h += (st.suppr === st.vue ? '<button data-act="sesdelOk">Confirmer la suppression définitive</button>' : '<button class="ghost" data-act="sesdel">Supprimer cette feuille (club)</button>');
+    h += '</div>';
     return h;
   }
   function general(disc) {
@@ -592,6 +595,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       return h;
     }
     var ids = Object.keys(st.lic).sort(function (a, b) { return st.lic[a].nom.localeCompare(st.lic[b].nom, 'fr'); });
+    h += '<p class="small muted">Mode club actif : vous pouvez corriger un tir ou supprimer une feuille depuis « Feuilles enregistrées ».</p><div class="row"><button style="flex:1" data-act="aller" data-e="historique">Gérer les feuilles</button><button style="flex:1" data-act="clublock">Verrouiller</button></div>';
     h += '<button class="primary" data-act="fnew">Ajouter un licencié</button>';
     if (!ids.length) return h + '<p class="muted">Aucun licencié pour le moment.</p>';
     h += '<div class="card"><h2>Licenciés (' + ids.length + ')</h2>';
@@ -656,50 +660,103 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
 
   /* ---- synoptique 3D : postes, tireurs, plateau et coups ---- */
   var SY = null;
+  function nomCourt(nom) { var p = String(nom || '').trim().split(/\s+/), t = p.length > 1 ? p[0] + ' ' + p[p.length - 1].charAt(0).toUpperCase() + '.' : p[0]; return t.length > 13 ? t.slice(0, 12) + '…' : t; }
   function creerSyn() {
-    var T = window.THREE, cv = document.createElement('canvas'), X = [-3.2, -1.6, 0, 1.6, 3.2];
+    var T = window.THREE, cv = document.createElement('canvas'), X = [-3, -1.5, 0, 1.5, 3], V = function (x, y, z) { return new T.Vector3(x, y, z); };
     var r = new T.WebGLRenderer({ canvas: cv, alpha: true, antialias: true }); r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    var sc = new T.Scene(); sc.fog = new T.Fog(0x0d2c22, 16, 38);
-    var cam = new T.PerspectiveCamera(42, 1.8, 0.1, 80);
-    sc.add(new T.HemisphereLight(0xffffff, 0x153527, 1.0)); var dl = new T.DirectionalLight(0xfff0d8, 0.9); dl.position.set(-4, 8, 6); sc.add(dl);
-    var sol = new T.Mesh(new T.PlaneGeometry(80, 60), new T.MeshStandardMaterial({ color: 0x1f6249, roughness: 1 })); sol.rotation.x = -Math.PI / 2; sol.position.z = -14; sc.add(sol);
-    var ligne = new T.Mesh(new T.BoxGeometry(8.4, 0.02, 0.07), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })); ligne.position.set(0, 0.02, -0.85); sc.add(ligne);
-    function etiq(txt, col, fond) { var c = document.createElement('canvas'); c.width = 128; c.height = 128; var g = c.getContext('2d'); if (fond) { g.fillStyle = fond; g.beginPath(); g.arc(64, 64, 56, 0, 7); g.fill(); } g.fillStyle = col; g.font = '900 ' + (txt.length > 1 ? 58 : 76) + 'px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 64, 70); var sp = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(c), transparent: true, depthTest: false })); return sp; }
-    X.forEach(function (x, p) { var pad = new T.Mesh(new T.CylinderGeometry(0.62, 0.62, 0.08, 36), new T.MeshStandardMaterial({ color: 0x3a8f70, roughness: 0.8 })); pad.position.set(x, 0.04, 0); sc.add(pad); var e = etiq('P' + (p + 1), '#d9efe4'); e.scale.set(0.8, 0.8, 1); e.position.set(x, 0.12, 1.25); sc.add(e); });
-    var matT = new T.MeshStandardMaterial({ color: 0x08130f, roughness: 0.9 });
-    var trapDTL = new T.Mesh(new T.BoxGeometry(1.2, 0.5, 0.9), matT); trapDTL.position.set(0, 0.25, -6.5); sc.add(trapDTL);
-    var trapFU = new T.Mesh(new T.BoxGeometry(7.8, 0.34, 0.9), matT); trapFU.position.set(0, 0.17, -6.5); sc.add(trapFU);
-    var tir = []; for (var i = 0; i < 6; i++) {
-      var g = new T.Group(), m = new T.MeshStandardMaterial({ color: 0xeef3ee, roughness: 0.6 });
-      var corps = new T.Mesh(new T.CylinderGeometry(0.22, 0.28, 0.95, 20), m); corps.position.y = 0.56; g.add(corps);
-      var tete = new T.Mesh(new T.SphereGeometry(0.2, 20, 16), m); tete.position.y = 1.24; g.add(tete);
-      var fusil = new T.Mesh(new T.BoxGeometry(0.06, 0.06, 1.0), new T.MeshStandardMaterial({ color: 0x1a1a1a })); fusil.position.set(0.14, 1.0, -0.5); g.add(fusil);
-      var n = etiq(String(i + 1), '#0b1a13', '#ffffff'); n.scale.set(0.7, 0.7, 1); n.position.y = 2.0; g.add(n);
-      g.visible = false; g.userData = { m: m, cx: 0, cz: 0 }; sc.add(g); tir.push(g);
+    var sc = new T.Scene(); sc.fog = new T.Fog(0xd5e9f4, 45, 130);
+    var cam = new T.PerspectiveCamera(40, 1.5, 0.1, 140);
+    sc.add(new T.HemisphereLight(0xffffff, 0x6b8a4e, 0.95)); var dl = new T.DirectionalLight(0xfff4dc, 0.85); dl.position.set(-5, 9, 6); sc.add(dl);
+    function M(c, o) { return new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.85 }, o || {})); }
+    // terrain : herbe nuancée, front de carrière et arbres en fond
+    var gg = new T.PlaneGeometry(150, 90, 30, 18), gp = gg.attributes.position, col = new Float32Array(gp.count * 3);
+    for (var a = 0; a < gp.count; a++) { var n = 0.5 + 0.5 * Math.sin(gp.getX(a) * 0.9 + gp.getY(a) * 1.7) * Math.cos(gp.getY(a) * 0.6); col[a * 3] = 0.20 + 0.06 * n; col[a * 3 + 1] = 0.38 + 0.08 * n; col[a * 3 + 2] = 0.16 + 0.04 * n; }
+    gg.setAttribute('color', new T.BufferAttribute(col, 3)); var sol = new T.Mesh(gg, new T.MeshStandardMaterial({ vertexColors: true, roughness: 1 })); sol.rotation.x = -Math.PI / 2; sol.position.z = -28; sc.add(sol);
+    var falaise = new T.Mesh(new T.CylinderGeometry(52, 52, 8, 56, 1, true, Math.PI * 0.62, Math.PI * 0.76), M(0xcdbb8f, { side: T.BackSide, roughness: 1 })); falaise.position.set(0, 4, 8); sc.add(falaise);
+    for (var k = 0; k < 30; k++) { var an0 = Math.PI * (0.63 + 0.74 * k / 29), tr0 = new T.Mesh(new T.SphereGeometry(2.4 + (k % 4) * 0.5, 10, 8), M([0x3f7a3a, 0x4c8a42, 0x356b34][k % 3], { roughness: 1 })); tr0.position.set(-52 * Math.sin(an0) * -1, 8.6 + (k % 3) * 0.4, 8 + 52 * Math.cos(an0)); sc.add(tr0); }
+    // pas de tir : allée, dalles numérotées, cabane ou fosse des lanceurs
+    var gPas = new T.Group(); sc.add(gPas);
+    var allee = new T.Mesh(new T.BoxGeometry(8.2, 0.03, 1.0), M(0xbfbfb8)); allee.position.set(0, 0.015, 1.05); gPas.add(allee);
+    function etiq(txt, fg, bg, w) { var c = document.createElement('canvas'); c.width = w || 128; c.height = 128; var g = c.getContext('2d'); if (bg) { g.fillStyle = bg; g.beginPath(); g.arc(64, 64, 58, 0, 7); g.fill(); } g.fillStyle = fg; g.font = '900 78px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, c.width / 2, 70); return new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(c), transparent: true, depthTest: false })); }
+    X.forEach(function (x, p) { var d0 = new T.Mesh(new T.BoxGeometry(1.15, 0.06, 1.15), M(0xdcdcd6)); d0.position.set(x, 0.03, 0); gPas.add(d0); var e = etiq(String(p + 1), '#16261d', '#ffffff'); e.scale.set(0.42, 0.42, 1); e.position.set(x + 0.72, 0.3, 0.6); gPas.add(e); });
+    var beton = M(0xb9b9b1), trapDTL = new T.Group(), b1 = new T.Mesh(new T.BoxGeometry(1.7, 0.7, 1.3), beton), b2 = new T.Mesh(new T.BoxGeometry(1.9, 0.1, 1.5), M(0x4a4f4a)), b3 = new T.Mesh(new T.BoxGeometry(1.2, 0.22, 0.05), M(0x101410));
+    b1.position.y = 0.35; b2.position.y = 0.75; b3.position.set(0, 0.5, -0.66); trapDTL.add(b1); trapDTL.add(b2); trapDTL.add(b3); trapDTL.position.set(0, 0, -9); gPas.add(trapDTL);
+    var trapFU = new T.Group(), f1 = new T.Mesh(new T.BoxGeometry(7.6, 0.45, 1.3), beton), f2 = new T.Mesh(new T.BoxGeometry(7.8, 0.08, 1.5), M(0x4a4f4a)); f1.position.y = 0.22; f2.position.y = 0.49; trapFU.add(f1); trapFU.add(f2); trapFU.position.set(0, 0, -9); gPas.add(trapFU);
+    // podium final
+    var gPod = new T.Group(), SLOT = [{ x: 0, h: 1.0 }, { x: -1.5, h: 0.72 }, { x: 1.5, h: 0.5 }], conf = [], mode = 'tir', pod = [];
+    SLOT.forEach(function (sl, n) { var bl = new T.Mesh(new T.BoxGeometry(1.45, sl.h, 1.3), M(n === 0 ? 0xf4f4f0 : 0xdedfda)); bl.position.set(sl.x, sl.h / 2, 0); gPod.add(bl); var liser = new T.Mesh(new T.BoxGeometry(1.47, 0.08, 1.32), M(n === 0 ? 0xff6a1f : n === 1 ? 0xaab2b8 : 0xb9763a)); liser.position.set(sl.x, sl.h - 0.04, 0); gPod.add(liser); var nb = etiq(String(n + 1), '#16261d', n === 0 ? '#ff8a3d' : '#ffffff'); nb.scale.set(0.5, 0.5, 1); nb.position.set(sl.x, sl.h * 0.45, 0.7); gPod.add(nb); });
+    for (var cf = 0; cf < 46; cf++) { var cm = new T.Mesh(new T.PlaneGeometry(0.12, 0.2), new T.MeshBasicMaterial({ color: [0xff6a1f, 0xffc247, 0xffffff, 0x35d07f][cf % 4], side: T.DoubleSide })); cm.position.set((Math.random() - 0.5) * 7, Math.random() * 6, (Math.random() - 0.5) * 3); cm.userData.v = 1.1 + Math.random() * 1.3; gPod.add(cm); conf.push(cm); }
+    gPod.visible = false; sc.add(gPod);
+    // tireurs : silhouette en position, fusil superposé, casquette et casque antibruit
+    var peau = M(0xe0b48e, { roughness: 0.7 }), pant = M(0x2e3440), noir = M(0x17181b, { roughness: 0.5 }), bois = M(0x7a4a23, { roughness: 0.6 }), casq = M(0x1f2937), GIL = [0x2f6f4f, 0x8a3030, 0x2b4c7e, 0x7a6426, 0x4d4d52, 0x5c3272];
+    function seg(g, p1, p2, rad, mat) { var d = p2.clone().sub(p1), m = new T.Mesh(new T.CylinderGeometry(rad, rad * 0.9, d.length(), 10), mat); m.position.copy(p1).add(p2).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(V(0, 1, 0), d.normalize()); g.add(m); return m; }
+    function box(g, w, h, d, mat, x, y, z) { var m = new T.Mesh(new T.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); g.add(m); return m; }
+    function faireTireur(i) {
+      var g = new T.Group(), gilet = M(GIL[i % GIL.length]);
+      var om = new T.Mesh(new T.CircleGeometry(0.46, 20), new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false })); om.rotation.x = -Math.PI / 2; om.position.y = 0.07; g.add(om);
+      seg(g, V(-0.11, 0.9, 0.0), V(-0.13, 0.06, -0.14), 0.085, pant); seg(g, V(0.11, 0.9, 0.0), V(0.13, 0.06, 0.12), 0.085, pant);
+      box(g, 0.12, 0.07, 0.27, noir, -0.13, 0.04, -0.2); box(g, 0.12, 0.07, 0.27, noir, 0.13, 0.04, 0.07);
+      var to = new T.Mesh(new T.CylinderGeometry(0.2, 0.17, 0.62, 14), gilet); to.position.set(0, 1.18, -0.04); to.rotation.x = -0.14; g.add(to);
+      var te = new T.Mesh(new T.SphereGeometry(0.12, 16, 12), peau); te.position.set(0, 1.63, -0.1); g.add(te);
+      var ca = new T.Mesh(new T.SphereGeometry(0.127, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), casq); ca.position.set(0, 1.65, -0.1); g.add(ca);
+      box(g, 0.17, 0.016, 0.13, casq, 0, 1.67, -0.24);
+      [-1, 1].forEach(function (sd) { var o = new T.Mesh(new T.SphereGeometry(0.055, 10, 8), M(0xc0392b)); o.position.set(sd * 0.125, 1.62, -0.09); g.add(o); });
+      var haut = new T.Group(); haut.position.set(0, 1.43, -0.06); g.add(haut);
+      [0.018, -0.02].forEach(function (y) { seg(haut, V(0.07, y, -0.2), V(0.07, y, -1.02), 0.018, noir); });
+      box(haut, 0.05, 0.085, 0.18, noir, 0.07, 0, -0.14); box(haut, 0.048, 0.06, 0.28, bois, 0.07, -0.03, -0.36);
+      var cr = box(haut, 0.042, 0.11, 0.36, bois, 0.08, -0.04, 0.1); cr.rotation.x = 0.16;
+      seg(haut, V(0.2, 0.0, 0.02), V(0.24, -0.2, -0.08), 0.052, gilet); seg(haut, V(0.24, -0.2, -0.08), V(0.09, -0.05, -0.12), 0.045, peau);
+      seg(haut, V(-0.2, 0.0, 0.0), V(-0.14, -0.14, -0.26), 0.052, gilet); seg(haut, V(-0.14, -0.14, -0.26), V(0.05, -0.07, -0.42), 0.045, peau);
+      haut.rotation.x = -0.62;
+      var lab = new T.Sprite(new T.SpriteMaterial({ transparent: true, depthTest: false })); lab.scale.set(2.3, 0.575, 1); lab.position.y = 2.2 + (i % 2) * 0.5; lab.renderOrder = 10; g.add(lab);
+      g.visible = false; g.userData = { haut: haut, lab: lab, cx: 0, cz: 0, nom: '', cle: '' }; sc.add(g); return g;
     }
-    var clay = new T.Mesh(new T.CylinderGeometry(0.2, 0.27, 0.08, 24), new T.MeshStandardMaterial({ color: 0xff6a1f, roughness: 0.45 })); clay.visible = false; sc.add(clay);
-    var fr = []; for (var f = 0; f < 8; f++) { var q = new T.Mesh(new T.TetrahedronGeometry(0.13), clay.material); q.visible = false; q.userData.v = new T.Vector3(Math.cos(f * 0.8) * 2.2, 1.2 + (f % 3), Math.sin(f * 0.8) * 2.2); sc.add(q); fr.push(q); }
+    function texNom(txt, on) { var c = document.createElement('canvas'); c.width = 384; c.height = 96; var g = c.getContext('2d'), rr = 44; g.fillStyle = on ? '#ff6a1f' : 'rgba(8,22,16,.84)'; g.beginPath(); g.moveTo(rr, 4); g.arcTo(380, 4, 380, 92, rr); g.arcTo(380, 92, 4, 92, rr); g.arcTo(4, 92, 4, 4, rr); g.arcTo(4, 4, 380, 4, rr); g.closePath(); g.fill();
+      var fs = 50; g.font = '800 ' + fs + 'px Arial'; while (g.measureText(txt).width > 340 && fs > 26) { fs -= 2; g.font = '800 ' + fs + 'px Arial'; } g.fillStyle = on ? '#1b0d04' : '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 192, 51); return new T.CanvasTexture(c); }
+    var tir = []; for (var i = 0; i < 6; i++) tir.push(faireTireur(i));
+    var anneau = new T.Mesh(new T.RingGeometry(0.56, 0.7, 36), new T.MeshBasicMaterial({ color: 0xff6a1f, transparent: true, side: T.DoubleSide, depthWrite: false })); anneau.rotation.x = -Math.PI / 2; anneau.position.y = 0.075; anneau.visible = false; sc.add(anneau);
+    var clay = new T.Mesh(new T.CylinderGeometry(0.2, 0.27, 0.08, 24), M(0xff6a1f, { roughness: 0.45 })); clay.visible = false; sc.add(clay);
+    var fr = []; for (var f = 0; f < 9; f++) { var q = new T.Mesh(new T.TetrahedronGeometry(0.14), clay.material); q.visible = false; q.userData.v = V(Math.cos(f * 0.7) * 2.4, 1.2 + (f % 3), Math.sin(f * 0.7) * 2.4); sc.add(q); fr.push(q); }
     function trait() { var gm = new T.BufferGeometry(); gm.setAttribute('position', new T.BufferAttribute(new Float32Array(6), 3)); var l = new T.Line(gm, new T.LineBasicMaterial({ color: 0xfff2a8, transparent: true })); l.visible = false; l.frustumCulled = false; sc.add(l); return l; }
-    var tr = [trait(), trait()], feu = new T.Mesh(new T.SphereGeometry(0.16, 12, 10), new T.MeshBasicMaterial({ color: 0xffe27a, transparent: true })); feu.visible = false; sc.add(feu);
+    var tr = [trait(), trait()], feu = new T.Mesh(new T.SphereGeometry(0.13, 12, 10), new T.MeshBasicMaterial({ color: 0xffe27a, transparent: true })), fum = new T.Mesh(new T.SphereGeometry(0.2, 12, 10), new T.MeshBasicMaterial({ color: 0xf2f2f2, transparent: true, depthWrite: false }));
+    feu.visible = fum.visible = false; sc.add(feu); sc.add(fum);
     var an = null, attente = null, actif = -1, run = false, W = 0, H = 0, last = 0, cap = null;
     var calme = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    function taille() { var w = cv.clientWidth, h = cv.clientHeight; if (!w || !h || (w === W && h === H)) return; W = w; H = h; r.setSize(w, h, false); cam.aspect = w / h; var d = Math.max(5.6, 4.0 / (0.384 * cam.aspect)); cam.position.set(0, 3.0 * d / 6, d); cam.lookAt(0, 1.0, -3); cam.updateProjectionMatrix(); }
-    function plateau(t, o) { o.set(an.sx + an.dx * t, 0.5 + 5.6 * t - 4.4 * t * t, -6.5 - 7 * t); return o; }
-    function applique(L) { actif = L.actif; trapDTL.visible = L.disc === 'DTL'; trapFU.visible = L.disc !== 'DTL'; tir.forEach(function (g, i) { var c = L.pos[i]; if (!c) { g.visible = false; return; } if (!g.visible) { g.position.set(c.x, 0, c.z); g.visible = true; } g.userData.cx = c.x; g.userData.cz = c.z; }); }
-    var v1 = new T.Vector3(), v2 = new T.Vector3();
-    function vise(l, g, cible, t, t0) { var a = l.geometry.attributes.position; a.setXYZ(0, g.position.x + 0.14, 1.0, g.position.z - 1.0); a.setXYZ(1, cible.x, cible.y, cible.z); a.needsUpdate = true; l.visible = t >= t0 && t < t0 + 0.16; l.material.opacity = 1 - (t - t0) / 0.16; if (l.visible) { feu.visible = true; feu.position.set(g.position.x + 0.14, 1.0, g.position.z - 1.05); feu.material.opacity = l.material.opacity; } }
+    function cadre() { var d; if (mode === 'podium') { d = Math.max(5.6, 3.3 / (0.364 * cam.aspect)); cam.position.set(0, 2.3, d); cam.lookAt(0, 1.75, 0); } else { d = Math.max(6.4, 4.2 / (0.364 * cam.aspect)); cam.position.set(0, 2.9, d); cam.lookAt(0, 1.85, -1.6); } cam.updateProjectionMatrix(); }
+    function taille() { var w = cv.clientWidth, h = cv.clientHeight; if (!w || !h || (w === W && h === H)) return; W = w; H = h; r.setSize(w, h, false); cam.aspect = w / h; cadre(); }
+    function dessinPodium(now, dt) {
+      anneau.visible = clay.visible = feu.visible = fum.visible = false; tr[0].visible = tr[1].visible = false; fr.forEach(function (q) { q.visible = false; });
+      tir.forEach(function (g, i) { var e = null; pod.forEach(function (x) { if (x.i === i) e = x; }); if (!e) { g.visible = false; return; } var sl = SLOT[e.place], u = g.userData; g.visible = true;
+        g.position.set(sl.x, sl.h + (e.place === 0 ? Math.abs(Math.sin(now / 280)) * 0.14 : 0), 0); g.rotation.y = Math.PI; u.haut.rotation.x += (-0.62 - u.haut.rotation.x) * Math.min(1, dt * 6); u.lab.position.y = 2.25; u.lab.visible = true;
+        var cle = e.txt + '|' + (e.place === 0); if (cle !== u.cle) { u.cle = cle; if (u.lab.material.map) u.lab.material.map.dispose(); u.lab.material.map = texNom(e.txt, e.place === 0); u.lab.material.needsUpdate = true; } });
+      conf.forEach(function (c) { c.position.y -= c.userData.v * dt; c.rotation.x += dt * 4; c.rotation.z += dt * 2.5; if (c.position.y < 0) { c.position.y = 5 + Math.random() * 1.5; c.position.x = (Math.random() - 0.5) * 7; } });
+    }
+    function plateau(t, o) { o.set(an.sx + an.dx * t, 0.75 + 6.2 * t - 4.6 * t * t, -9 - 8 * t); return o; }
+    function applique(L) { actif = L.actif; trapDTL.visible = L.disc === 'DTL'; trapFU.visible = L.disc !== 'DTL'; tir.forEach(function (g, i) { var c = L.pos[i]; if (!c) { g.visible = false; return; } if (!g.visible) { g.position.set(c.x, 0, c.z); g.visible = true; } g.userData.cx = c.x; g.userData.cz = c.z; g.userData.nom = nomCourt(L.noms[i]); }); }
+    var v1 = V(0, 0, 0), v2 = V(0, 0, 0), bouche = V(0, 0, 0);
+    function vise(l, cible, t, t0) { var a = l.geometry.attributes.position; a.setXYZ(0, bouche.x, bouche.y, bouche.z); a.setXYZ(1, cible.x, cible.y, cible.z); a.needsUpdate = true; var u = (t - t0) / 0.16; l.visible = u >= 0 && u < 1; l.material.opacity = 1 - u;
+      if (l.visible) { feu.visible = true; feu.position.copy(bouche); feu.material.opacity = 1 - u; } var w = (t - t0) / 0.7; if (w >= 0 && w < 1) { fum.visible = true; fum.position.set(bouche.x, bouche.y + w * 0.35, bouche.z - 0.25 - w * 0.4); fum.scale.setScalar(0.6 + w * 2.2); fum.material.opacity = 0.5 * (1 - w); } }
     function dessin(now) {
-      taille(); var dt = Math.min(0.05, (now - last) / 1000); last = now;
-      feu.visible = false;
+      taille(); var dt = Math.min(0.05, (now - last) / 1000), k = Math.min(1, dt * 6); last = now; feu.visible = false; fum.visible = false;
+      if (mode === 'podium') { dessinPodium(now, dt); r.render(sc, cam); return; }
+      var t = an ? (now - an.t0) / 1000 : 0, hit = an ? (an.r === 1 ? 0.38 : an.r === 2 ? 0.66 : 99) : 0;
+      tir.forEach(function (g, i) {
+        if (!g.visible) return; var u = g.userData, on = an ? an.i === i : actif === i, cle = u.nom + '|' + on;
+        u.lab.visible = false;
+        g.position.x += (u.cx - g.position.x) * Math.min(1, dt * 4); g.position.z += (u.cz - g.position.z) * Math.min(1, dt * 4);
+        var lacet = 0, site = on ? 0.14 : -0.62;
+        if (an && an.i === i && t < 1.1) { plateau(Math.min(t, hit, 1.0), v1); var dx = v1.x - g.position.x, dz = v1.z - g.position.z; lacet = Math.atan2(-dx, -dz); site = Math.atan2(v1.y - 1.43, Math.sqrt(dx * dx + dz * dz)); [0.38, an.r === 1 ? 99 : 0.66].forEach(function (ts) { var e = t - ts; if (e >= 0 && e < 0.25) site += 0.1 * (1 - e / 0.25); }); }
+        g.rotation.y += (lacet - g.rotation.y) * k; u.haut.rotation.x += (site - u.haut.rotation.x) * Math.min(1, dt * 9);
+      });
+      var ia = an ? an.i : actif; anneau.visible = ia >= 0 && tir[ia] && tir[ia].visible; if (anneau.visible) { anneau.position.x = tir[ia].position.x; anneau.position.z = tir[ia].position.z; anneau.material.opacity = 0.55 + 0.35 * Math.sin(now / 260); }
       if (an) {
-        var t = (now - an.t0) / 1000, g = tir[an.i], hit = an.r === 1 ? 0.38 : an.r === 2 ? 0.66 : 99;
+        var g = tir[an.i]; g.updateMatrixWorld(true); bouche.set(0.07, 0, -1.05); g.userData.haut.localToWorld(bouche);
         plateau(Math.min(t, hit), v1); clay.position.copy(v1); clay.rotation.y = t * 14; clay.visible = t < hit && v1.y > 0.05;
-        plateau(0.38, v2); if (an.r !== 1) { v2.x += 0.7; v2.y += 0.45; } vise(tr[0], g, v2, t, 0.38);
-        if (an.r !== 1) { plateau(0.66, v2); if (an.r === 0) { v2.x -= 0.7; v2.y += 0.5; } vise(tr[1], g, v2, t, 0.66); } else tr[1].visible = false;
-        var ec = t - hit; fr.forEach(function (q) { q.visible = ec >= 0 && ec < 0.7; if (q.visible) { var u = q.userData.v; plateau(hit, v2); q.position.set(v2.x + u.x * ec, v2.y + u.y * ec - 4 * ec * ec, v2.z + u.z * ec); q.rotation.set(ec * 9, ec * 7, 0); } });
-        if (t > 1.45) { an = null; clay.visible = false; tr[0].visible = tr[1].visible = false; if (cap && cap.isConnected) cap.textContent = ''; if (attente) { applique(attente); attente = null; } }
+        plateau(0.38, v2); if (an.r !== 1) { v2.x += 0.8; v2.y += 0.5; } vise(tr[0], v2, t, 0.38);
+        if (an.r !== 1) { plateau(0.66, v2); if (an.r === 0) { v2.x -= 0.8; v2.y += 0.55; } vise(tr[1], v2, t, 0.66); } else tr[1].visible = false;
+        var ec = t - hit; fr.forEach(function (q) { q.visible = ec >= 0 && ec < 0.75; if (q.visible) { var w = q.userData.v; plateau(hit, v2); q.position.set(v2.x + w.x * ec, v2.y + w.y * ec - 4 * ec * ec, v2.z + w.z * ec); q.rotation.set(ec * 9, ec * 7, 0); } });
+        if (t > 1.5) { an = null; clay.visible = false; tr[0].visible = tr[1].visible = false; if (cap && cap.isConnected) cap.textContent = ''; if (attente) { applique(attente); attente = null; } }
       }
-      tir.forEach(function (g, i) { if (!g.visible) return; var k = Math.min(1, dt * 5); g.position.x += (g.userData.cx - g.position.x) * k; g.position.z += (g.userData.cz - g.position.z) * k; var on = an ? an.i === i : actif === i; g.userData.m.color.setHex(on ? 0xff6a1f : 0xeef3ee); g.scale.setScalar(on ? 1.12 : 1); });
       r.render(sc, cam);
     }
     function boucle(now) { if (!cv.isConnected || document.hidden) { run = false; return; } dessin(now); requestAnimationFrame(boucle); }
@@ -707,19 +764,21 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     document.addEventListener('visibilitychange', function () { if (!document.hidden && cv.isConnected) go(); });
     return {
       cv: cv, go: go,
-      maj: function (L, c) { cap = c; if (an && !calme) attente = L; else { an = null; applique(L); } },
-      tir: function (i, poste, rr, disc) { if (calme || !tir[i].visible) return; attente = null; an = { i: i, r: rr, t0: performance.now(), sx: disc === 'DTL' ? 0 : X[Math.floor(Math.random() * 5)], dx: (Math.random() - 0.5) * 5 }; if (cap && cap.isConnected) cap.textContent = rr === 1 ? '1er coup' : rr === 2 ? '2e coup' : (disc === 'DTL' ? 'Raté' : 'Zéro'); },
+      podium: function (liste) { mode = 'podium'; an = null; attente = null; pod = liste; gPas.visible = false; gPod.visible = true; cadre(); },
+      maj: function (L, c) { cap = c; if (mode !== 'tir') { mode = 'tir'; gPas.visible = true; gPod.visible = false; tir.forEach(function (g, i) { g.visible = false; g.rotation.y = 0; g.userData.lab.position.y = 2.2 + (i % 2) * 0.5; }); cadre(); } if (an && !calme) attente = L; else { an = null; applique(L); } },
+      tir: function (i, poste, rr, disc) { if (calme || !tir[i].visible) return; attente = null; an = { i: i, r: rr, t0: performance.now(), sx: disc === 'DTL' ? 0 : X[Math.floor(Math.random() * 5)], dx: (Math.random() - 0.5) * 6 }; if (cap && cap.isConnected) cap.textContent = rr === 1 ? '1er coup' : rr === 2 ? '2e coup' : (disc === 'DTL' ? 'Raté' : 'Zéro'); },
       stop: function () { an = null; attente = null; clay.visible = false; tr[0].visible = tr[1].visible = false; fr.forEach(function (q) { q.visible = false; }); }
     };
   }
   function syn3d() {
-    var box = document.querySelector('.syn'), s = st.cours; if (!box || !s || !window.THREE) return;
+    var box = document.querySelector('.syn'), fin = st.ecran === 'resultat' ? st.ses[st.vue] : null, s = fin || st.cours; if (!box || !s || !window.THREE) return;
     try {
       if (!SY) SY = creerSyn();
       if (SY.cv.parentNode !== box) box.appendChild(SY.cv); box.classList.add('on');
-      var e = etat(s), X = [-3.2, -1.6, 0, 1.6, 3.2], pris = {}, pos = [];
-      for (var q = 0; q < e.N; q++) { var i = (e.i + q) % e.N, k = (s.disc !== 'DTL' && i < e.i) ? e.k + 1 : e.k, po = posteDe(s.disc, i, Math.min(k, NB - 1)); pos[i] = { x: X[po - 1], z: pris[po] ? 1.7 : 0 }; pris[po] = 1; }
-      SY.maj({ disc: s.disc, pos: pos, actif: (e.fini || e.rotation) ? -1 : e.i }, box.querySelector('.cap')); SY.go();
+      if (fin) { SY.podium(classement(fin).slice(0, 3).map(function (x, n) { return { i: x.i, place: n, txt: x.rang + '. ' + nomCourt(x.nom) + ' · ' + x.total }; })); SY.go(); return; }
+      var e = etat(s), X = [-3, -1.5, 0, 1.5, 3], pris = {}, pos = [];
+      for (var q = 0; q < e.N; q++) { var i = (e.i + q) % e.N, k = (s.disc !== 'DTL' && i < e.i) ? e.k + 1 : e.k, po = posteDe(s.disc, i, Math.min(k, NB - 1)); pos[i] = { x: X[po - 1], z: pris[po] ? 2.1 : 0 }; pris[po] = 1; }
+      SY.maj({ disc: s.disc, pos: pos, noms: s.tireurs.map(function (t) { return t.nom; }), actif: (e.fini || e.rotation) ? -1 : e.i }, box.querySelector('.cap')); SY.go();
     } catch (err) { SY = null; box.classList.remove('on'); }
   }
   window.addEventListener('load', syn3d);
@@ -735,8 +794,11 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   app.addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
     var a = b.dataset.act, s;
-    if (a !== 'suppr' && a !== 'dellic' && a !== 'fdel') st.suppr = null;
-    if (a === 'aller') { if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; if (st.ecran !== 'club') st.clubOk = false; }
+    if (a !== 'suppr' && a !== 'dellic' && a !== 'fdel' && a !== 'sesdel') st.suppr = null;
+    if (a === 'aller') { if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; }
+    else if (a === 'clublock') { st.clubOk = false; st.edit = false; st.ecran = 'accueil'; }
+    else if (a === 'sesdel') { st.suppr = st.vue; }
+    else if (a === 'sesdelOk') { var sid = st.vue; delete st.ses[sid]; saveLocal(); retirer('sessions', sid); st.edit = false; st.ecran = 'historique'; }
     else if (a === 'clubin') { var cp = document.getElementById('cpass'); if (cp && cp.value === CLUB_PASS) { st.clubOk = true; st.msg = ''; } else st.msg = 'Mot de passe incorrect.'; }
     else if (a === 'fnew') { st.fiche = ''; st.msg = ''; }
     else if (a === 'fedit') { st.fiche = b.dataset.id; st.msg = ''; }
@@ -765,7 +827,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'edit') st.edit = !st.edit;
     else if (a === 'gdisc') st.gdisc = b.dataset.d;
     else if (a === 'skin') { st.skin = st.skin === 'sombre' ? 'clair' : 'sombre'; lset('btc.skin2', st.skin); peau(); }
-    else if (a === 'cell') { if (!st.edit) return; s = st.ses[st.vue]; var idx = (+b.dataset.k) * s.tireurs.length + (+b.dataset.i), r = s.tirs[idx]; s.tirs[idx] = r === 1 ? 2 : r === 2 ? 0 : 1; saveLocal(); pousser('sessions', s.id, corpsSes(s)); }
+    else if (a === 'cell') { if (!st.edit || !st.clubOk) return; s = st.ses[st.vue]; var idx = (+b.dataset.k) * s.tireurs.length + (+b.dataset.i), r = s.tirs[idx]; s.tirs[idx] = r === 1 ? 2 : r === 2 ? 0 : 1; saveLocal(); pousser('sessions', st.vue, corpsSes(s)); }
     else if (a === 'rejouer') { s = st.ses[st.vue]; nouvellePlanche(s.disc, s.tireurs.map(function (t) { return t.nom; })); }
     else if (a === 'copier') { s = st.ses[st.vue]; var txt = resume(s); st.copie = 'Si la copie n\'a pas fonctionné, sélectionnez le texte ci-dessous.';
       try { navigator.clipboard.writeText(txt).then(function () { st.copie = 'Résultat copié. Collez-le dans un message ou un mail.'; render(); }, function () {}); } catch (e) {} }
