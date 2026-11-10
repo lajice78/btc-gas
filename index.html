@@ -263,19 +263,22 @@ input[type=password],input[type=tel],input[type=email]{font:inherit;color:var(--
 @media(min-width:900px){#app.large .dir{font-size:19px}#app.large .dir .t{font-size:30px}#app.large .card h2{font-size:24px}}
 .hero .meteo{position:absolute;left:16px;top:54px;z-index:3;max-width:72%;padding:7px 12px;border-radius:14px;background:rgba(6,16,12,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;font-size:13px;line-height:1.35;text-shadow:0 1px 3px rgba(0,0,0,.5)}
 .hero .meteo:empty{display:none}
+.hero .cpt{position:absolute;right:14px;top:54px;z-index:3;padding:7px 12px;border-radius:14px;background:rgba(6,16,12,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;font-size:12px;line-height:1.4;text-align:right;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.hero .cpt b{font-size:17px;font-weight:800;color:#ffb070}
+.hero .meteo{max-width:52%!important}
 .hero .meteo b{font-size:17px;font-weight:800;margin-right:4px}
 #app.club3d .hero.on3d{height:calc(100vh - 86px);height:calc(100dvh - 86px);max-height:940px;min-height:420px}
 .hero.on3d .sub{bottom:24px}
 .hero .ign{bottom:7px!important;left:20px;right:auto!important}
 button.adm{align-self:center;min-height:0;padding:6px 10px;font-size:12px;opacity:.55;letter-spacing:.3px}
 .hero .ign{position:absolute;right:10px;bottom:6px;z-index:3;font-size:9px;letter-spacing:.3px;color:rgba(255,255,255,.75);text-shadow:0 1px 3px rgba(0,0,0,.7)}
-.hero.on3d .pin{display:flex;visibility:hidden;position:absolute;z-index:4;transform:translate(-50%,-100%);flex-direction:column;align-items:center;gap:0;min-height:0;padding:7px 14px 8px;border-radius:16px;border:2px solid #fff;background:linear-gradient(180deg,var(--accent2),var(--accent));color:#1b0d04;font-family:var(--display);font-weight:900;font-size:17px;line-height:1.05;box-shadow:0 8px 22px rgba(0,0,0,.4)}
-.hero.on3d .pin small{font-family:var(--body);font-weight:700;font-size:11px;letter-spacing:.5px;text-transform:uppercase}
-.hero.on3d .pin::after{content:"";position:absolute;left:50%;bottom:-9px;width:14px;height:14px;background:var(--accent);border-right:2px solid #fff;border-bottom:2px solid #fff;transform:translateX(-50%) rotate(45deg)}
-.hero.on3d .pin.bas{transform:translate(-50%,34px)}
-.hero.on3d .pin.bas::after{bottom:auto;top:-9px;border:none;border-left:2px solid #fff;border-top:2px solid #fff}
-.hero.on3d .pin.clair{background:#fff;color:#0c1f17;border-color:var(--accent)}
-.hero.on3d .pin.clair::after{background:#fff;border-color:var(--accent)}
+.hero.on3d .pin{display:inline-flex;visibility:hidden;position:absolute;z-index:4;transform:translate(-50%,calc(-100% - 16px));flex-direction:row;align-items:baseline;gap:6px;min-height:0;width:auto;padding:9px 13px 9px 11px;border-radius:99px;border:1px solid rgba(255,255,255,.3);background:rgba(8,20,15,.46);backdrop-filter:blur(10px) saturate(1.3);-webkit-backdrop-filter:blur(10px) saturate(1.3);color:#fff;font-family:var(--display);font-weight:800;font-size:14px;line-height:1;letter-spacing:.3px;box-shadow:0 4px 14px rgba(0,0,0,.22);white-space:nowrap;text-transform:none}
+.hero.on3d .pin::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--accent);align-self:center;box-shadow:0 0 0 3px rgba(255,106,31,.28)}
+.hero.on3d .pin small{font-family:var(--body);font-weight:500;font-size:11px;letter-spacing:.2px;opacity:.82;text-transform:none}
+.hero.on3d .pin::after{content:"";position:absolute;left:50%;top:100%;width:1px;height:16px;background:linear-gradient(rgba(255,255,255,.75),rgba(255,255,255,0))}
+.hero.on3d .pin.bas{transform:translate(-50%,24px)}
+.hero.on3d .pin.bas::after{top:auto;bottom:100%;background:linear-gradient(rgba(255,255,255,0),rgba(255,255,255,.75))}
+.hero.on3d .pin.clair{background:rgba(255,255,255,.8);color:#0c1f17;border-color:rgba(255,255,255,.95)}
 .hero.on3d + *{margin-top:0}
 #app.club3d .disc{display:none} /* les étiquettes de la maquette remplacent les deux gros boutons ; ils restent en secours sans 3D */
 </style>
@@ -403,6 +406,13 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   /* ---- météo du stand de Gas : température, temps, vent (Open-Meteo) ---- */
   var MET = { 0: 'Ciel dégagé', 1: 'Peu nuageux', 2: 'Éclaircies', 3: 'Couvert', 45: 'Brouillard', 48: 'Brouillard givrant', 51: 'Bruine', 53: 'Bruine', 55: 'Bruine', 56: 'Bruine verglaçante', 57: 'Bruine verglaçante', 61: 'Pluie faible', 63: 'Pluie', 65: 'Forte pluie', 66: 'Pluie verglaçante', 67: 'Pluie verglaçante', 71: 'Neige faible', 73: 'Neige', 75: 'Forte neige', 77: 'Neige en grains', 80: 'Averses', 81: 'Averses', 82: 'Fortes averses', 85: 'Averses de neige', 86: 'Averses de neige', 95: 'Orage', 96: 'Orage et grêle', 99: 'Orage et grêle' };
+  // compteur de plateaux lancés : feuilles terminées + tirs déjà notés des planches en cours
+  function compteurHtml() {
+    var J = new Date(); J.setHours(0, 0, 0, 0); var tj = J.getTime(), ta = new Date(J.getFullYear(), 0, 1).getTime(), jour = 0, an = 0, vus = {}, fr = function (n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); };
+    Object.keys(st.ses).forEach(function (id) { var c = st.ses[id]; vus[id] = 1; if (!(c.date >= ta)) return; var n = c.tirs ? c.tirs.length : 0; an += n; if (c.date >= tj) jour += n; });
+    [st.pauses, st.direct || {}, st.cours ? { c: st.cours } : {}].forEach(function (o) { Object.keys(o).forEach(function (k) { var c = o[k], id = (c && c.id) || k; if (!c || vus[id] || !c.tirs || !(c.date >= ta)) return; vus[id] = 1; an += c.tirs.length; if (c.date >= tj) jour += c.tirs.length; }); });
+    return '<span class="cpt"><b>' + fr(jour) + '</b> plateau' + (jour > 1 ? 'x' : '') + ' aujourd\'hui<br>' + fr(an) + ' cette année</span>';
+  }
   function meteoHtml() { var m = st.meteo; if (!m) return ''; var d = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'][Math.round(m.dir / 45) % 8]; return '<b>' + m.t + ' °C</b> ' + (MET[m.code] || '') + '<br>Vent ' + m.vent + ' km/h ' + d + (m.raf > m.vent + 4 ? ' · rafales ' + m.raf : ''); }
   function chargerMeteo() {
     if (!HORS) return;
@@ -574,7 +584,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       '<rect x="222" y="194" width="30" height="10" rx="2" fill="#06140e"/>' +
       '<g transform="translate(318 64) rotate(-16)"><g class="' + (heroAnim ? 'vol' : '') + '"><ellipse cx="0" cy="7" rx="44" ry="13" fill="#9c3306"/><ellipse cx="0" cy="0" rx="44" ry="13" fill="#ff6a1f"/><ellipse cx="0" cy="-3" rx="27" ry="7.5" fill="#ff8a4a"/><ellipse cx="0" cy="-5" rx="12" ry="3.2" fill="#ffc09a"/></g></g>' +
       '<g class="' + (heroAnim ? 'eclat' : '') + '" fill="#ffa24a"><path d="M262 120l13-5-3 12z"/><path d="M284 142l9 2-6 7z" opacity=".8"/><path d="M246 144l6-8 5 9z" opacity=".6"/></g>' +
-      '</svg>' + p + '<button class="pin" data-pin="0" data-act="nouv" data-d="DTL" data-p="A">DTL<small>pas A</small></button><button class="pin bas" data-pin="1" data-act="nouv" data-d="FU" data-p="B">FU<small>fosse B</small></button><button class="pin" data-pin="2" data-act="nouv" data-d="DTL" data-p="C">DTL<small>pas C</small></button><button class="pin bas clair" data-pin="3" data-act="aller" data-e="' + (HORS && DIRECT_ON ? 'direct' : 'general') + '">Scores<small>club-house</small></button><span class="wm">BTC<em>GAS</em></span><span class="meteo">' + meteoHtml() + '</span><span class="sub">Feuille de marque DTL · FU</span></div>'; heroAnim = false;
+      '</svg>' + p + '<button class="pin" data-pin="0" data-act="nouv" data-d="DTL" data-p="A">DTL<small>pas A</small></button><button class="pin bas" data-pin="1" data-act="nouv" data-d="FU" data-p="B">FU<small>fosse B</small></button><button class="pin" data-pin="2" data-act="nouv" data-d="DTL" data-p="C">DTL<small>pas C</small></button><button class="pin bas clair" data-pin="3" data-act="aller" data-e="' + (HORS && DIRECT_ON ? 'direct' : 'general') + '">Scores<small>club-house</small></button><span class="wm">BTC<em>GAS</em></span><span class="meteo">' + meteoHtml() + '</span>' + compteurHtml() + '<span class="sub">Feuille de marque DTL · FU</span></div>'; heroAnim = false;
     h += '<div class="stack"><div class="disc">' +
       '<button data-act="nouv" data-d="DTL"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M60 14L22 2"/><path d="M60 14V0"/><path d="M60 14L98 2"/></g><rect x="52" y="12" width="16" height="7" rx="2" fill="#ff6a1f"/><g fill="currentColor"><circle cx="16" cy="40" r="5"/><circle cx="38" cy="47" r="5"/><circle cx="60" cy="50" r="5"/><circle cx="82" cy="47" r="5"/><circle cx="104" cy="40" r="5"/></g></svg><b>DTL</b><span>5 tireurs, 5 plateaux par poste<br>3 pts / 2 pts / 0</span></button>' +
       '<button data-act="nouv" data-d="FU"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M16 14L4 0"/><path d="M38 14L46 0"/><path d="M60 14V0"/><path d="M82 14L72 0"/><path d="M104 14L116 0"/></g><g fill="#ff6a1f"><rect x="10" y="12" width="12" height="7" rx="2"/><rect x="32" y="12" width="12" height="7" rx="2"/><rect x="54" y="12" width="12" height="7" rx="2"/><rect x="76" y="12" width="12" height="7" rx="2"/><rect x="98" y="12" width="12" height="7" rx="2"/></g><g fill="currentColor"><circle cx="16" cy="48" r="5"/><circle cx="38" cy="48" r="5"/><circle cx="60" cy="48" r="5"/><circle cx="82" cy="48" r="5"/><circle cx="104" cy="48" r="5"/></g></svg><b>FU</b><span>Fosse universelle, 6 tireurs<br>1 pt par plateau cassé</span></button></div></div>';
