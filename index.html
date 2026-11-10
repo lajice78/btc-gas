@@ -246,6 +246,7 @@ input[type=password],input[type=tel],input[type=email]{font:inherit;color:var(--
 .hero.on3d .pin.bas{transform:translate(-50%,34px)}
 .hero.on3d .pin.bas::after{bottom:auto;top:-9px;border:none;border-left:2px solid #fff;border-top:2px solid #fff}
 .hero.on3d + *{margin-top:0}
+#app.club3d .disc{display:none} /* les étiquettes de la maquette remplacent les deux gros boutons ; ils restent en secours sans 3D */
 </style>
 </head>
 <body>
@@ -692,8 +693,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   function hero3d() {
     var hero = document.querySelector('.hero'); if (!hero || !window.THREE) return;
-    try { if (!G3) G3 = creer3d(); if (G3.cv.parentNode !== hero) hero.insertBefore(G3.cv, hero.children[1] || null); hero.classList.add('on3d'); G3.go(); }
-    catch (e) { G3 = null; window.THREE = null; hero.classList.remove('on3d'); }
+    try { if (!G3) G3 = creer3d(); if (G3.cv.parentNode !== hero) hero.insertBefore(G3.cv, hero.children[1] || null); hero.classList.add('on3d'); app.classList.add('club3d'); G3.go(); }
+    catch (e) { G3 = null; window.THREE = null; hero.classList.remove('on3d'); app.classList.remove('club3d'); }
   }
   window.addEventListener('load', hero3d);
   app.addEventListener('pointermove', function (ev) { if (!G3 || !G3.cv.isConnected) return; var rc = G3.cv.getBoundingClientRect(); mx = Math.max(-0.5, Math.min(0.5, (ev.clientX - rc.left) / rc.width - 0.5)); my = Math.max(-0.5, Math.min(0.5, (ev.clientY - rc.top) / rc.height - 0.5)); });
