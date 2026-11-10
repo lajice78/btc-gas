@@ -132,6 +132,8 @@ input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
 .item:last-child{border-bottom:none}
 .item button{min-height:42px;padding:6px 14px}
 .item.col{flex-direction:column;align-items:stretch}
+.item .coche{flex:none;width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border-radius:12px;font-size:22px;font-weight:900;line-height:1}
+.item .coche.on{background:linear-gradient(180deg,var(--accent2),var(--accent));color:var(--on-accent);border-color:transparent}
 .item.col .row{justify-content:flex-start}
 .item button.primary{font-size:18px;padding:6px 18px}
 textarea{width:100%;min-height:150px;font:14px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:12px;padding:10px}
@@ -242,9 +244,15 @@ input[type=password],input[type=tel],input[type=email]{font:inherit;color:var(--
 .hero.on3d .pill{left:auto;right:14px;top:16px}
 .mur{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
 #app.large{max-width:1500px}
+.sup{display:grid;gap:18px;align-items:start}
+@media(min-width:1000px){.sup{grid-template-columns:1.25fr 1fr}}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px}
+.kpi b{display:block;font-family:var(--display);font-weight:900;font-size:36px;line-height:1.05}
+.kpi b small{font-size:14px;color:var(--muted)}
+.kpi span{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
 .dir{display:grid;grid-template-columns:1fr repeat(5,30px) 62px;gap:8px 6px;align-items:center;font-variant-numeric:tabular-nums}
 .dir .lab{font-size:12px;color:var(--muted);text-align:center}
-.dir .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dir .nm{font-weight:600;overflow:hidden;line-height:1.15}
 .dir .nm small{display:block;font-size:12px;font-weight:700;color:var(--accent-ink)}
 .dir .nm.on{color:var(--accent-ink);font-weight:800}
 .dir .c{text-align:center;height:30px;line-height:30px;border-radius:8px;background:var(--surface2);border:1px solid var(--line);font-size:14px}
@@ -317,7 +325,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   var CLUB_MAIL = ''; // adresse de la boîte du club (à renseigner)
   var HORS = !(window.claude && window.claude.use); // version hébergée, hors Claude
   var app = document.getElementById('app');
-  var st = { ecran: 'accueil', lic: {}, ses: {}, cours: null, planche: null, vue: null, edit: false, msg: '', copie: '', suppr: null, gdisc: 'DTL', gtype: 'moy', gqui: 'tous', gmin: true, direct: {}, clubOk: false, fiche: null };
+  var st = { ecran: 'accueil', lic: {}, ses: {}, cours: null, planche: null, vue: null, edit: false, msg: '', copie: '', suppr: null, gdisc: 'DTL', gtype: 'moy', gqui: 'tous', gmin: true, direct: {}, dper: 0, dtic: 0, sel: {}, clubOk: false, fiche: null };
   var db = null, dl = null, sync = 'attente', heroAnim = true, ecranVu = '';
 
   /* ---- stockage local (confort, peut manquer) ---- */
@@ -381,11 +389,11 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     }).catch(function () { fbCours = false; if (sync !== 'ok') { sync = 'local'; render(); } });
   }
   /* ---- planches en cours, visibles en direct au club-house ---- */
-  var dirT = null, DIRECT_ON = false;
+  var dirT = null, DIRECT_ON = true;
   function vivre() { var s = st.cours; if (!HORS || !DIRECT_ON || !s) return; fetch(FB + 'direct/' + encodeURIComponent(s.id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: fbEnc({ disc: s.disc, pas: s.pas || '', date: s.date, maj: Date.now(), tireurs: s.tireurs, tirs: s.tirs }).mapValue.fields }) }).catch(function () {}); }
   function mort(id) { if (!HORS || !DIRECT_ON || !id) return; fetch(FB + 'direct/' + encodeURIComponent(id), { method: 'DELETE' }).catch(function () {}); }
   function fbDirect() { if (!HORS) return; fbListe('direct', '', {}).then(function (d) { st.direct = d; if (st.ecran === 'direct') render(); }).catch(function () {}); }
-  function dirGo() { if (!HORS || dirT) return; fbDirect(); dirT = setInterval(function () { if (st.ecran !== 'direct') { clearInterval(dirT); dirT = null; return; } if (!document.hidden) { fbDirect(); fbSync(false); } }, 6000); }
+  function dirGo() { if (!HORS || dirT) return; fbDirect(); dirT = setInterval(function () { if (st.ecran !== 'direct') { clearInterval(dirT); dirT = null; return; } if (!document.hidden) { if (++st.dtic % 2 === 0) st.dper = (st.dper + 1) % 4; fbDirect(); fbSync(false); } }, 6000); }
   function pousser(col, id, body) { if (HORS) { fbSet(col, col === 'sessions' ? 'ses' : 'lic', id); return; } if (!db) return; db.collection(col).doc(id).set(body).catch(function () {}); }
   function retirer(col, id) { if (HORS) { fetch(FB + col + '/' + encodeURIComponent(id), { method: 'DELETE', headers: fbTete() }).catch(function () {}); if (col === 'licencies') fetch(FB + 'fiches/' + encodeURIComponent(id), { method: 'DELETE', headers: fbTete() }).catch(function () {}); return; } if (!db) return; db.collection(col).doc(id).delete().catch(function () {}); }
   function fusion(col, cle, snap, corps) {
@@ -465,9 +473,9 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     classement(s).forEach(function (x) { L.push([x.rang, '"' + x.nom.replace(/"/g, '""') + '"', s.tireurs[x.i].statut].concat(x.marks.map(function (r) { return symb(s.disc, r); }), [x.total, x.casses, x.premier]).join(';')); });
     return '﻿' + L.join('\r\n');
   }
-  function csvTout() {
+  function csvTout(seul) {
     var h = ['Date', 'Discipline', 'Feuille', 'Rang', 'Tireur', 'Statut']; for (var k = 1; k <= NB; k++) h.push('P' + k); h.push('Total', 'Casses', '1er coup'); var L = [h.join(';')];
-    Object.keys(st.ses).sort(function (a, b) { return st.ses[a].date - st.ses[b].date; }).forEach(function (id) { var s = st.ses[id]; classement(s).forEach(function (x) { L.push([fdate(s.date), s.disc, id, x.rang, '"' + x.nom.replace(/"/g, '""') + '"', s.tireurs[x.i].statut].concat(x.marks.map(function (r) { return symb(s.disc, r); }), [x.total, x.casses, x.premier]).join(';')); }); });
+    Object.keys(st.ses).filter(function (id) { return !seul || seul[id]; }).sort(function (a, b) { return st.ses[a].date - st.ses[b].date; }).forEach(function (id) { var s = st.ses[id]; classement(s).forEach(function (x) { L.push([fdate(s.date), s.disc, id, x.rang, '"' + x.nom.replace(/"/g, '""') + '"', s.tireurs[x.i].statut].concat(x.marks.map(function (r) { return symb(s.disc, r); }), [x.total, x.casses, x.premier]).join(';')); }); });
     return '\ufeff' + L.join('\r\n');
   }
   function csvGeneral() { var L = ['Discipline;Rang;Tireur;Series;Moyenne;Meilleure;Total']; ['DTL', 'FU'].forEach(function (d) { general(d).forEach(function (o) { L.push([d, o.rang, '"' + o.nom.replace(/"/g, '""') + '"', o.n, (Math.round(o.moy * 100) / 100).toString().replace('.', ','), o.best, o.tot].join(';')); }); }); return '\ufeff' + L.join('\r\n'); }
@@ -500,6 +508,15 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function telecharger(nom, data) {
     if (!dl && HORS) { try { var bl = data instanceof Blob ? data : new Blob([data], { type: 'text/csv;charset=utf-8' }), u = URL.createObjectURL(bl), l = document.createElement('a'); l.href = u; l.download = nom; document.body.appendChild(l); l.click(); l.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 4000); } catch (e) {} return; }
     if (!dl) return; dl.save({ filename: nom, data: data }).catch(function (e) { if (e && e.code !== 'declined') { st.msg = 'Téléchargement impossible ici. Utilisez « Copier le résultat ».'; render(); } }); }
+  function envoyerSel() {
+    var ids = Object.keys(st.sel).filter(function (id) { return st.ses[id]; }).sort(function (a, b) { return st.ses[a].date - st.ses[b].date; }), nom = 'btc-gas-selection-' + horodate() + '.csv', data = csvTout(st.sel);
+    if (!ids.length) return; if (!navigator.share) { telecharger(nom, data); return; }
+    Promise.all(ids.slice(0, 10).map(function (id) { return new Promise(function (ok) { try { feuille(st.ses[id]).toBlob(function (bl) { ok(bl ? new File([bl], nomFichier(st.ses[id], 'png'), { type: 'image/png' }) : null); }, 'image/png'); } catch (e) { ok(null); } }); })).then(function (im) {
+      var d = { title: 'Feuilles ' + CLUB, text: ids.map(function (id) { return resume(st.ses[id]); }).join('\n\n') }, f = im.filter(Boolean);
+      try { f.push(new File([data], nom, { type: 'text/csv' })); if (navigator.canShare && navigator.canShare({ files: f })) d.files = f; else if (navigator.canShare && navigator.canShare({ files: im.filter(Boolean) })) d.files = im.filter(Boolean); } catch (e) {}
+      navigator.share(d).catch(function () {});
+    });
+  }
   function envoyer(s) {
     if (!(HORS && navigator.share)) { st.vue = s.id; st.msg = ''; st.copie = ''; st.ecran = 'resultat'; render(); window.scrollTo(0, 0); return; }
     feuille(s).toBlob(function (bl) {
@@ -525,14 +542,14 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       '<rect x="222" y="194" width="30" height="10" rx="2" fill="#06140e"/>' +
       '<g transform="translate(318 64) rotate(-16)"><g class="' + (heroAnim ? 'vol' : '') + '"><ellipse cx="0" cy="7" rx="44" ry="13" fill="#9c3306"/><ellipse cx="0" cy="0" rx="44" ry="13" fill="#ff6a1f"/><ellipse cx="0" cy="-3" rx="27" ry="7.5" fill="#ff8a4a"/><ellipse cx="0" cy="-5" rx="12" ry="3.2" fill="#ffc09a"/></g></g>' +
       '<g class="' + (heroAnim ? 'eclat' : '') + '" fill="#ffa24a"><path d="M262 120l13-5-3 12z"/><path d="M284 142l9 2-6 7z" opacity=".8"/><path d="M246 144l6-8 5 9z" opacity=".6"/></g>' +
-      '</svg>' + p + '<button class="pin" data-pin="0" data-act="nouv" data-d="DTL" data-p="A">DTL<small>pas A</small></button><button class="pin bas" data-pin="1" data-act="nouv" data-d="FU" data-p="B">FU<small>fosse B</small></button><button class="pin" data-pin="2" data-act="nouv" data-d="DTL" data-p="C">DTL<small>pas C</small></button><button class="pin bas clair" data-pin="3" data-act="aller" data-e="general">Scores<small>club-house</small></button><span class="wm">BTC<em>GAS</em></span><span class="sub">Feuille de marque DTL · FU</span></div>'; heroAnim = false;
+      '</svg>' + p + '<button class="pin" data-pin="0" data-act="nouv" data-d="DTL" data-p="A">DTL<small>pas A</small></button><button class="pin bas" data-pin="1" data-act="nouv" data-d="FU" data-p="B">FU<small>fosse B</small></button><button class="pin" data-pin="2" data-act="nouv" data-d="DTL" data-p="C">DTL<small>pas C</small></button><button class="pin bas clair" data-pin="3" data-act="aller" data-e="' + (HORS && DIRECT_ON ? 'direct' : 'general') + '">Scores<small>club-house</small></button><span class="wm">BTC<em>GAS</em></span><span class="sub">Feuille de marque DTL · FU</span></div>'; heroAnim = false;
     if (st.cours) { var e = etat(st.cours); h += '<div class="card"><h2>Planche en cours</h2><p>' + st.cours.disc + ', ' + st.cours.tireurs.length + ' tireur(s), ' + e.n + ' tirs notés sur ' + e.total + '.</p><div class="row"><button class="primary" data-act="aller" data-e="tir">Reprendre</button><button data-act="abandon">Abandonner</button></div></div>'; }
     h += '<div class="stack"><div class="disc">' +
       '<button data-act="nouv" data-d="DTL"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M60 14L22 2"/><path d="M60 14V0"/><path d="M60 14L98 2"/></g><rect x="52" y="12" width="16" height="7" rx="2" fill="#ff6a1f"/><g fill="currentColor"><circle cx="16" cy="40" r="5"/><circle cx="38" cy="47" r="5"/><circle cx="60" cy="50" r="5"/><circle cx="82" cy="47" r="5"/><circle cx="104" cy="40" r="5"/></g></svg><b>DTL</b><span>5 tireurs, 5 plateaux par poste<br>3 pts / 2 pts / 0</span></button>' +
       '<button data-act="nouv" data-d="FU"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M16 14L4 0"/><path d="M38 14L46 0"/><path d="M60 14V0"/><path d="M82 14L72 0"/><path d="M104 14L116 0"/></g><g fill="#ff6a1f"><rect x="10" y="12" width="12" height="7" rx="2"/><rect x="32" y="12" width="12" height="7" rx="2"/><rect x="54" y="12" width="12" height="7" rx="2"/><rect x="76" y="12" width="12" height="7" rx="2"/><rect x="98" y="12" width="12" height="7" rx="2"/></g><g fill="currentColor"><circle cx="16" cy="48" r="5"/><circle cx="38" cy="48" r="5"/><circle cx="60" cy="48" r="5"/><circle cx="82" cy="48" r="5"/><circle cx="104" cy="48" r="5"/></g></svg><b>FU</b><span>Fosse universelle, 6 tireurs<br>1 pt par plateau cassé</span></button></div></div>';
     var n = Object.keys(st.ses).length, l = Object.keys(st.lic).length;
     h += '<div class="stack"><button data-act="aller" data-e="general">Classement général</button><button data-act="aller" data-e="historique">Feuilles enregistrées (' + n + ')</button></div>';
-    if (HORS && DIRECT_ON) h += '<button data-act="aller" data-e="direct">En direct : planches en cours</button>';
+    if (HORS && DIRECT_ON) h += '<button data-act="aller" data-e="direct">Écran du club-house : direct et résultats</button>';
     h += '<button class="ghost" data-act="aller" data-e="club">Espace administrateur</button>';
     h += '<button class="ghost" data-act="skin">Affichage : passer en ' + (st.skin === 'sombre' ? 'clair' : 'sombre') + '</button>';
     h += '<p class="small muted">' + (sync === 'ok' ? 'Les feuilles sont partagées avec tout le club.' : HORS ? 'Hors ligne : les feuilles seront envoyées au club au retour du réseau.' : 'Les feuilles sont gardées sur ce téléphone.') + ' La liste des licenciés est tenue par l\'administrateur.' + '</p>';
@@ -542,7 +559,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     var p = st.planche, noms = licNoms(), pris = {}; p.noms.forEach(function (n) { if (n.trim()) pris[slug(n)] = 1; });
     var h = entete('Planche ' + p.disc, 'accueil') + '<p class="muted">Inscrivez les tireurs dans l\'ordre de passage. ' + (p.disc === 'DTL' ? 'Le tireur 1 commence au poste 1, le tireur 2 au poste 2, etc.' : 'Le tireur 6 attend derrière le poste 1.') + ' Un nom absent de la liste du club est noté comme invité.</p><div class="stack">';
     p.noms.forEach(function (n, i) {
-      h += '<div class="slot"><span class="n">' + (i + 1) + '</span><input type="text" id="t' + i + '" data-slot="' + i + '" list="dl-lic" autocomplete="off" placeholder="Nom du tireur ' + (i + 1) + '" value="' + esc(n) + '"></div>';
+      h += '<div class="slot"><span class="n">' + (i + 1) + '</span><input type="text" id="t' + i + '" data-slot="' + i + '" list="dl-lic" autocomplete="off" enterkeyhint="' + (i + 1 < p.noms.length ? 'next' : 'done') + '" placeholder="Nom du tireur ' + (i + 1) + '" value="' + esc(n) + '"></div>';
     });
     h += '</div><datalist id="dl-lic">' + noms.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>';
     var dispo = noms.filter(function (n) { return !pris[slug(n)]; });
@@ -595,9 +612,9 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     return h;
   }
   var GT = [['moy', 'Moyenne'], ['best4', '4 meilleures'], ['assid', 'Assiduité'], ['record', 'Record'], ['prog', 'Progression'], ['mois', 'Du mois']];
-  function general(disc, type, qui, min3) {
+  function general(disc, type, qui, min3, depuis) {
     type = type || 'moy'; var m = {}, now = new Date(), m0 = new Date(now.getFullYear(), now.getMonth(), 1).getTime(), add = function (p, q) { return p + q; };
-    Object.keys(st.ses).forEach(function (id) { var s = st.ses[id]; if (s.disc !== disc || (type === 'mois' && s.date < m0)) return;
+    Object.keys(st.ses).forEach(function (id) { var s = st.ses[id]; if (s.disc !== disc || (type === 'mois' && s.date < m0) || (depuis && s.date < depuis)) return;
       bilan(s).forEach(function (x) { var k = slug(x.nom), o = m[k] || (m[k] = { nom: x.nom, n: 0, tot: 0, best: 0, inv: true, L: [] }); o.n++; o.tot += x.total; if (x.total > o.best) o.best = x.total; if (s.tireurs[x.i].statut !== 'invite') o.inv = false; o.L.push([s.date, x.total]); }); });
     var a = Object.keys(m).map(function (k) {
       var o = m[k]; o.moy = o.tot / o.n; o.L.sort(function (p, q) { return p[0] - q[0]; }); var t = o.L.map(function (e) { return e[1]; }), d = t.slice().sort(function (p, q) { return q - p; });
@@ -629,8 +646,15 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function vDirect() {
     var now = Date.now(), ordre = { A: 1, B: 2, C: 3 }, L = Object.keys(st.direct || {}).map(function (id) { return st.direct[id]; }).filter(function (s) { return s && s.maj > now - 45 * 60000 && s.tireurs && s.tireurs.length && s.tirs && s.tirs.length < s.tireurs.length * NB; });
     L.sort(function (p, q) { return (ordre[p.pas] || 9) - (ordre[q.pas] || 9) || p.date - q.date; });
-    var h = entete('En direct', 'accueil');
-    if (!HORS) return h + '<p class="muted">Le direct fonctionne sur la version ouverte par le QR code.</p>';
+    var h = entete('Club-house', 'accueil');
+    if (!HORS) return h + '<p class="muted">Cet écran fonctionne sur la version ouverte par le QR code.</p>';
+    var J = new Date(); J.setHours(0, 0, 0, 0); var t0 = [J.getTime(), J.getTime() - ((J.getDay() + 6) % 7) * 86400000, new Date(J.getFullYear(), J.getMonth(), 1).getTime(), new Date(J.getFullYear(), 0, 1).getTime()], PN = ['Jour', 'Semaine', 'Mois', 'Année'], PT = ['du jour', 'de la semaine', 'du mois', "de l'année"];
+    var tous = Object.keys(st.ses).map(function (id) { return st.ses[id]; }), duJour = tous.filter(function (s) { return s.date >= t0[0]; }), nbS = duJour.reduce(function (p, s) { return p + s.tireurs.length; }, 0);
+    function rec(depuis) { var o = null; ['DTL', 'FU'].forEach(function (dc) { if (o) return; tous.forEach(function (s) { if (s.disc !== dc || s.date < depuis) return; bilan(s).forEach(function (x) { if (!o || x.total > o.v) o = { v: x.total, nom: x.nom, d: dc }; }); }); }); return o; }
+    function kpi(v, lab) { return '<div class="kpi"><b>' + v + '</b><span>' + lab + '</span></div>'; }
+    function krec(o, lab) { return o ? '<div class="kpi"><b>' + o.v + '<small>/' + maxPts(o.d) + '</small></b><span>' + lab + ' ' + o.d + ' · ' + esc(nomCourt(o.nom)) + '</span></div>' : kpi('-', lab); }
+    h += '<div class="card"><div class="kpis">' + kpi(L.length, 'planche' + (L.length > 1 ? 's' : '') + ' en cours') + kpi(nbS, 'séries aujourd\'hui') + kpi(nbS * NB, 'plateaux du jour') + krec(rec(t0[0]), 'meilleure du jour') + krec(rec(t0[2]), 'record du mois') + krec(rec(t0[3]), 'record de l\'année') + '</div></div>';
+    h += '<div class="sup"><div class="stack">';
     if (!L.length) h += '<div class="card"><h2>Aucune planche en cours</h2><p class="muted">Les planches apparaissent ici dès qu\'elles démarrent, et se mettent à jour à chaque tir.</p></div>';
     h += '<div class="mur">';
     L.forEach(function (s) {
@@ -640,18 +664,27 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       b.forEach(function (x) { var on = x.i === e.i; h += '<span class="nm' + (on ? ' on' : '') + '">' + esc(x.nom) + (on ? '<small>poste ' + e.poste + '</small>' : '') + '</span>'; for (var g = 0; g < 5; g++) h += '<span class="c">' + (x.marks[g * 5] === null ? '' : x.series[g]) + '</span>'; h += '<span class="t">' + x.total + '<small>/' + mx + '</small></span>'; });
       h += '</div>' + (der === null ? '' : '<p class="small muted">Dernier tir : ' + esc(qui) + ', ' + (der === 1 ? 'cassé au 1er coup' : der === 2 ? 'cassé au 2e coup' : 'raté') + '.</p>') + '</div>';
     });
-    h += '</div>';
-    var j0 = new Date(); j0.setHours(0, 0, 0, 0); var fin = Object.keys(st.ses).map(function (id) { return st.ses[id]; }).filter(function (s) { return s.date >= j0.getTime(); }).sort(function (p, q) { return q.date - p.date; }).slice(0, 6);
-    if (fin.length) { h += '<div class="card"><h2>Séries terminées aujourd\'hui</h2><div class="mur">'; fin.forEach(function (s) { h += '<div><b>' + s.disc + ' · ' + fdate(s.date).slice(11) + '</b>' + classement(s).slice(0, 3).map(function (x) { return '<div class="small">' + x.rang + '. ' + esc(x.nom) + ' <b>' + x.total + '</b>/' + maxPts(s.disc) + '</div>'; }).join('') + '</div>'; }); h += '</div></div>'; }
+    h += '</div></div><div class="stack"><div class="chips">' + PN.map(function (n, k) { return '<button' + (st.dper === k ? ' class="primary"' : '') + ' data-act="dper" data-k="' + k + '">' + n + '</button>'; }).join('') + '</div>';
+    var vide = true; ['DTL', 'FU'].forEach(function (dc) {
+      var a = general(dc, 'moy', 'tous', false, t0[st.dper]); if (!a.length) return; vide = false;
+      h += '<div class="card"><h2>Classement ' + PT[st.dper] + ' · ' + dc + '</h2>' + a.slice(0, 6).map(function (o) { return '<div class="rank' + (o.rang === 1 ? ' first' : '') + '"><span class="rg">' + o.rang + '</span><span><b>' + esc(o.nom) + '</b><br><span class="small muted">' + o.n + ' série' + (o.n > 1 ? 's' : '') + ' · meilleure ' + o.best + '</span></span><span class="sc">' + (Math.round(o.moy * 10) / 10).toString().replace('.', ',') + '<small>/' + maxPts(dc) + '</small></span></div>'; }).join('') + '</div>'; });
+    if (vide) h += '<div class="card"><h2>Classement ' + PT[st.dper] + '</h2><p class="muted">Aucune série enregistrée sur cette période.</p></div>';
+    h += '<p class="small muted">Moyenne par série de 25 plateaux. La période change toute seule toutes les 12 secondes.</p></div></div>';
     return h;
   }
   function vHisto() {
     var ids = Object.keys(st.ses).sort(function (a, b) { return st.ses[b].date - st.ses[a].date; });
     var h = entete('Feuilles', 'accueil');
     if (!ids.length) return h + '<p class="muted">Aucune feuille enregistrée. Une feuille est créée à la fin de chaque planche.</p>';
+    var adm = st.clubOk, sel = ids.filter(function (id) { return st.sel[id]; }), n = sel.length;
+    if (adm) {
+      h += '<div class="card"><h2>Sélection</h2><p class="small muted">Cochez les feuilles sans les ouvrir, puis envoyez-les ou supprimez-les.</p><div class="row"><button style="flex:1" data-act="seltout">' + (n === ids.length ? 'Tout décocher' : 'Tout cocher') + '</button><span class="small muted" style="flex:1;text-align:center">' + n + ' sur ' + ids.length + '</span></div>';
+      if (n) h += '<div class="row"><button class="primary" style="flex:1" data-act="selenv">Envoyer (' + n + ')</button><button style="flex:1" data-act="selcsv">CSV</button></div>' + (st.suppr === 'sel' ? '<button data-act="seldelOk">Confirmer la suppression définitive de ' + n + ' feuille' + (n > 1 ? 's' : '') + '</button>' : '<button class="ghost" data-act="seldel">Supprimer la sélection</button>');
+      h += '</div>';
+    }
     h += '<div class="card">';
     ids.forEach(function (id) { var s = st.ses[id], c = classement(s)[0];
-      h += '<div class="item col"><span><b>' + s.disc + '</b> · ' + fdate(s.date) + '<br><span class="small muted">' + s.tireurs.length + ' tireur(s) · 1er : ' + esc(c.nom) + ' ' + c.total + '/' + maxPts(s.disc) + '</span></span><span class="row">' +
+      h += '<div class="item' + (adm ? ' selable' : ' col') + '">' + (adm ? '<button class="coche' + (st.sel[id] ? ' on' : '') + '" data-act="sel" data-id="' + id + '" aria-pressed="' + (st.sel[id] ? 'true' : 'false') + '" aria-label="Sélectionner la feuille">' + (st.sel[id] ? '✓' : '') + '</button>' : '') + '<span style="flex:1"><b>' + s.disc + '</b> · ' + fdate(s.date) + '<br><span class="small muted">' + s.tireurs.length + ' tireur(s) · 1er : ' + esc(c.nom) + ' ' + c.total + '/' + maxPts(s.disc) + '</span></span><span class="row">' +
         '<button data-act="voir" data-id="' + id + '">Ouvrir</button>' + '</span></div>'; });
     return h + '</div>';
   }
@@ -920,7 +953,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     function dessinPodium(now, dt) {
       anneau.visible = clay.visible = feu.visible = fum.visible = false; tr[0].visible = tr[1].visible = false; fr.forEach(function (q) { q.visible = false; });
       tir.forEach(function (g, i) { var e = null; pod.forEach(function (x) { if (x.i === i) e = x; }); if (!e) { g.visible = false; return; } var sl = SLOT[e.place], u = g.userData; g.visible = true;
-        g.position.set(sl.x, sl.h + (e.place === 0 ? Math.abs(Math.sin(now / 280)) * 0.14 : 0), 0); g.rotation.y = Math.PI; u.haut.rotation.x += (-0.62 - u.haut.rotation.x) * Math.min(1, dt * 6); u.lab.position.y = 2.25; u.lab.visible = true;
+        g.position.set(sl.x, sl.h + (e.place === 0 ? Math.abs(Math.sin(now / 280)) * 0.14 : 0), 0); g.rotation.y = Math.PI; u.haut.rotation.x += (-0.62 - u.haut.rotation.x) * Math.min(1, dt * 6); u.lab.position.set(0, 2.25, 0); u.lab.scale.set(2.3, 0.575, 1); u.lab.material.opacity = 1; u.cle2 = ''; u.lab.visible = true;
         var cle = e.txt + '|' + (e.place === 0); if (cle !== u.cle) { u.cle = cle; if (u.lab.material.map) u.lab.material.map.dispose(); u.lab.material.map = texNom(e.txt, e.place === 0); u.lab.material.needsUpdate = true; } });
       conf.forEach(function (c) { c.position.y -= c.userData.v * dt; c.rotation.x += dt * 4; c.rotation.z += dt * 2.5; if (c.position.y < 0) { c.position.y = 5 + Math.random() * 1.5; c.position.x = (Math.random() - 0.5) * 7; } });
     }
@@ -935,7 +968,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       var t = an ? (now - an.t0) / 1000 : 0, hit = an ? (an.r === 1 ? 0.38 : an.r === 2 ? 0.66 : 99) : 0;
       tir.forEach(function (g, i) {
         if (!g.visible) return; var u = g.userData, on = an ? an.i === i : actif === i, cle = u.nom + '|' + on;
-        u.lab.visible = false;
+        if (cle !== u.cle2) { u.cle2 = cle; u.cle = ''; if (u.lab.material.map) u.lab.material.map.dispose(); u.lab.material.map = texNom(u.nom, on); u.lab.material.needsUpdate = true; }
+        u.lab.visible = true; u.lab.scale.set(0.96, 0.24, 1); u.lab.material.opacity = on ? 0.95 : 0.72; u.lab.position.set(-0.98 * Math.sin(g.rotation.y), 0.17, 0.98 * Math.cos(g.rotation.y)); // petit bandeau discret au pied du tireur
         g.position.x += (u.cx - g.position.x) * Math.min(1, dt * 4); g.position.z += (u.cz - g.position.z) * Math.min(1, dt * 4);
         var lacet = 0, site = on ? 0.14 : -0.62;
         if (an && an.i === i && t < 1.1) { plateau(Math.min(t, hit, 1.0), v1); var dx = v1.x - g.position.x, dz = v1.z - g.position.z; lacet = Math.atan2(-dx, -dz); site = Math.atan2(v1.y - 1.43, Math.sqrt(dx * dx + dz * dz)); [0.38, an.r === 1 ? 99 : 0.66].forEach(function (ts) { var e = t - ts; if (e >= 0 && e < 0.25) site += 0.1 * (1 - e / 0.25); }); }
@@ -982,15 +1016,22 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (t.dataset.slot !== undefined) { var i = +t.dataset.slot; st.planche.noms[i] = t.value; var m = document.getElementById('memo' + i); if (m) m.hidden = !(t.value.trim() && !st.lic[slug(t.value)]); }
     if (t.dataset.memo !== undefined) st.planche.memo[+t.dataset.memo] = t.checked;
   });
-  app.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && ev.target.id === 'cpass') { var bb = app.querySelector('[data-act=clubin]'); if (bb) bb.click(); return; }
+  app.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && ev.target.dataset && ev.target.dataset.slot !== undefined) { ev.preventDefault(); var nx = document.getElementById('t' + (+ev.target.dataset.slot + 1)); if (nx) { nx.focus(); nx.select(); } else { ev.target.blur(); var bd = app.querySelector('[data-act=demarrer]'); if (bd) bd.scrollIntoView({ block: 'center' }); } return; }
+    if (ev.key === 'Enter' && ev.target.id === 'cpass') { var bb = app.querySelector('[data-act=clubin]'); if (bb) bb.click(); return; }
     if (ev.key === 'Enter' && ev.target.id === 'newlic') { ajouterLic(ev.target.value); render(); var n = document.getElementById('newlic'); if (n) n.focus(); } });
   app.addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
     var a = b.dataset.act, s;
-    if (a !== 'suppr' && a !== 'dellic' && a !== 'fdel' && a !== 'sesdel') st.suppr = null;
+    if (a !== 'suppr' && a !== 'dellic' && a !== 'fdel' && a !== 'sesdel' && a !== 'seldel') st.suppr = null;
     if (a === 'aller') { if (b.dataset.e === 'direct') dirGo(); if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; }
     else if (a === 'clublock') { jeton = null; st.clubOk = false; st.edit = false; st.ecran = 'accueil'; }
     else if (a === 'sesdel') { st.suppr = st.vue; }
+    else if (a === 'sel') { if (st.sel[b.dataset.id]) delete st.sel[b.dataset.id]; else st.sel[b.dataset.id] = 1; }
+    else if (a === 'seltout') { var tous = Object.keys(st.ses), plein = tous.every(function (id) { return st.sel[id]; }); st.sel = {}; if (!plein) tous.forEach(function (id) { st.sel[id] = 1; }); }
+    else if (a === 'seldel') { st.suppr = 'sel'; }
+    else if (a === 'seldelOk') { if (st.clubOk) Object.keys(st.sel).forEach(function (id) { if (!st.ses[id]) return; delete st.ses[id]; retirer('sessions', id); }); st.sel = {}; saveLocal(); }
+    else if (a === 'selcsv') { telecharger('btc-gas-selection-' + horodate() + '.csv', csvTout(st.sel)); return; }
+    else if (a === 'selenv') { envoyerSel(); return; }
     else if (a === 'sesdelOk') { var sid = st.vue; delete st.ses[sid]; saveLocal(); retirer('sessions', sid); st.edit = false; st.ecran = 'historique'; }
     else if (a === 'clubin') { var cp = document.getElementById('cpass'), code = cp ? cp.value : '';
       if (HORS) { if (!code) return; b.disabled = true; b.textContent = 'Connexion…'; fbLogin(code).then(function (tk) { jeton = tk; st.clubOk = true; st.msg = ''; render(); fbFiches(); }, function () { st.msg = navigator.onLine === false ? 'Pas de réseau : connexion impossible.' : 'Mot de passe incorrect.'; render(); }); return; }
@@ -1024,6 +1065,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'gtype') st.gtype = b.dataset.t;
     else if (a === 'gqui') st.gqui = b.dataset.q;
     else if (a === 'gmin') st.gmin = !st.gmin;
+    else if (a === 'dper') { st.dper = +b.dataset.k; st.dtic = 0; }
     else if (a === 'xtout') { telecharger('btc-gas-feuilles-' + horodate() + '.csv', csvTout()); return; }
     else if (a === 'xgen') { telecharger('btc-gas-classement-' + horodate() + '.csv', csvGeneral()); return; }
     else if (a === 'xjson') { telecharger('btc-gas-sauvegarde-' + horodate() + '.json', jsonTout()); return; }
