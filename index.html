@@ -736,7 +736,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     });
     h += '</div><datalist id="dl-lic">' + noms.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>';
     if (st.msg) h += '<p class="err">' + esc(st.msg) + '</p>';
-    h += '<div class="row"><button class="primary" style="flex:2" data-act="demarrer">Démarrer</button><button style="flex:1" data-act="preparer">Préparer</button></div>';
+    h += '<button class="primary" data-act="demarrer">Démarrer la session</button><button data-act="preparer">Préparer pour plus tard</button>';
     h += '<p class="small muted" style="margin:0 0 -30px;text-align:center">Fusil ouvert hors du poste. <button class="link" style="display:inline;width:auto;padding:0;font-size:inherit" data-act="secu" data-r="planche">Règles de sécurité</button></p>';
     return h;
   }
