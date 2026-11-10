@@ -304,8 +304,44 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function licNoms() { return Object.keys(st.lic).map(function (k) { return st.lic[k].nom; }).sort(function (a, b) { return a.localeCompare(b, 'fr'); }); }
 
   /* ---- base partagée (si disponible) ---- */
-  function pousser(col, id, body) { if (!db) return; db.collection(col).doc(id).set(body).catch(function () {}); }
-  function retirer(col, id) { if (!db) return; db.collection(col).doc(id).delete().catch(function () {}); }
+  /* ---- base en ligne du club (Firestore, version hébergée) ---- */
+  var FB = 'https://firestore.googleapis.com/v1/projects/btc-gas/databases/(default)/documents/', fbVu = 0, fbCours = false;
+  function fbEnc(v) {
+    if (typeof v === 'string') return { stringValue: v }; if (typeof v === 'boolean') return { booleanValue: v };
+    if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+    if (Array.isArray(v)) return { arrayValue: { values: v.map(fbEnc) } };
+    var f = {}; Object.keys(v).forEach(function (k) { f[k] = fbEnc(v[k]); }); return { mapValue: { fields: f } };
+  }
+  function fbDec(v) {
+    if ('stringValue' in v) return v.stringValue; if ('booleanValue' in v) return v.booleanValue; if ('integerValue' in v) return Number(v.integerValue); if ('doubleValue' in v) return v.doubleValue;
+    if ('arrayValue' in v) return (v.arrayValue.values || []).map(fbDec);
+    if ('mapValue' in v) { var o = {}, f = v.mapValue.fields || {}; Object.keys(f).forEach(function (k) { o[k] = fbDec(f[k]); }); return o; } return null;
+  }
+  function fbCorps(col, x) { return col === 'licencies' ? { nom: x.nom } : corpsSes(x); }
+  function fbSet(col, cle, id) {
+    var x = st[cle][id]; if (!x) return Promise.resolve();
+    return fetch(FB + col + '/' + encodeURIComponent(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: fbEnc(fbCorps(col, x)).mapValue.fields }) })
+      .then(function (r) { if (!r.ok) throw 0; if (st[cle][id]) { st[cle][id]._s = 1; delete st[cle][id]._d; saveLocal(); } })
+      .catch(function () { if (st[cle][id]) { st[cle][id]._d = 1; saveLocal(); } });
+  }
+  function fbListe(col, jeton, acc) {
+    return fetch(FB + col + '?pageSize=300' + (jeton ? '&pageToken=' + encodeURIComponent(jeton) : '')).then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (j) {
+      (j.documents || []).forEach(function (d) { acc[d.name.split('/').pop()] = fbDec({ mapValue: { fields: d.fields || {} } }); });
+      return j.nextPageToken ? fbListe(col, j.nextPageToken, acc) : acc; });
+  }
+  function fbSync(force) {
+    if (!HORS || fbCours || (!force && Date.now() - fbVu < 20000)) return; fbCours = true;
+    Promise.all([fbListe('sessions', '', {}), fbListe('licencies', '', {})]).then(function (res) {
+      [['sessions', 'ses', res[0]], ['licencies', 'lic', res[1]]].forEach(function (t) {
+        var col = t[0], cle = t[1], dist = t[2], loc = st[cle];
+        Object.keys(dist).forEach(function (id) { if (loc[id] && loc[id]._d) { fbSet(col, cle, id); return; } loc[id] = Object.assign(col === 'licencies' ? (loc[id] || {}) : {}, dist[id], { _s: 1 }); if (col === 'sessions') loc[id].id = id; });
+        Object.keys(loc).forEach(function (id) { if (dist[id]) return; if (col === 'licencies' && loc[id]._s && !loc[id]._d) delete loc[id]; else fbSet(col, cle, id); });
+      });
+      fbVu = Date.now(); fbCours = false; sync = 'ok'; saveLocal(); if (st.ecran !== 'tir' && st.ecran !== 'planche' && st.ecran !== 'club') render();
+    }).catch(function () { fbCours = false; if (sync !== 'ok') { sync = 'local'; render(); } });
+  }
+  function pousser(col, id, body) { if (HORS) { fbSet(col, col === 'sessions' ? 'ses' : 'lic', id); return; } if (!db) return; db.collection(col).doc(id).set(body).catch(function () {}); }
+  function retirer(col, id) { if (HORS) { fetch(FB + col + '/' + encodeURIComponent(id), { method: 'DELETE' }).catch(function () {}); return; } if (!db) return; db.collection(col).doc(id).delete().catch(function () {}); }
   function fusion(col, cle, snap, corps) {
     var loc = st[cle], vus = {};
     snap.docs.forEach(function (d) { var v = d.data(); if (!v) return; vus[d.id] = 1; loc[d.id] = Object.assign({}, v, { _s: 1 }); });
@@ -321,10 +357,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function corpsSes(s) { return { disc: s.disc, date: s.date, tireurs: s.tireurs, tirs: s.tirs, termine: true }; }
   function brancher() {
     if (HORS) {
-      sync = 'local'; render();
-      try { fetch('licencies.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (a) {
-        if (!Array.isArray(a)) return; var o = {}; a.forEach(function (n) { if (typeof n === 'string' && n.trim()) o[slug(n)] = { nom: n.trim().replace(/\s+/g, ' ') }; });
-        Object.keys(o).forEach(function (id) { if (!st.lic[id]) st.lic[id] = o[id]; }); saveLocal(); if (st.ecran === 'accueil') render(); }).catch(function () {}); } catch (e) {}
+      sync = 'attente'; render(); fbSync(true);
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) fbSync(false); });
       try { var ml = document.createElement('link'); ml.rel = 'manifest'; ml.href = 'manifest.webmanifest'; document.head.appendChild(ml);
         var ic = document.createElement('link'); ic.rel = 'apple-touch-icon'; ic.href = 'icon-192.png'; document.head.appendChild(ic);
         if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {}); } catch (e) {}
@@ -425,11 +459,11 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   /* ---- rendu ---- */
   function marks(disc, arr, cls) { return arr.map(function (r, j) { return '<span class="m ' + (r === null || r === undefined ? '' : 'r' + r) + '"' + (cls ? ' ' + cls(j) : '') + '>' + symb(disc, r) + '</span>'; }).join(''); }
   function entete(titre, retour) {
-    var p = sync === 'ok' ? '<span class="pill on">Partagé</span>' : sync === 'attente' ? '<span class="pill">Connexion</span>' : '<span class="pill">Ce téléphone</span>';
+    var p = sync === 'ok' ? '<span class="pill on">Partagé</span>' : sync === 'attente' ? '<span class="pill">Connexion</span>' : '<span class="pill">' + (HORS ? 'Hors ligne' : 'Ce téléphone') + '</span>';
     return '<header class="bar">' + (retour ? '<button class="ghost" data-act="aller" data-e="' + retour + '" aria-label="Retour">Retour</button>' : '') + '<h1>' + titre + '</h1>' + p + '</header>';
   }
   function vAccueil() {
-    var p = sync === 'ok' ? '<span class="pill on">Partagé</span>' : sync === 'attente' ? '<span class="pill">Connexion</span>' : '<span class="pill">Ce téléphone</span>';
+    var p = sync === 'ok' ? '<span class="pill on">Partagé</span>' : sync === 'attente' ? '<span class="pill">Connexion</span>' : '<span class="pill">' + (HORS ? 'Hors ligne' : 'Ce téléphone') + '</span>';
     var h = '<div class="hero"><svg viewBox="0 0 400 230" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">' +
       '<circle cx="318" cy="64" r="86" fill="rgba(255,150,70,.10)"/><circle cx="318" cy="64" r="52" fill="rgba(255,150,70,.10)"/>' +
       '<path d="M0 178 Q 70 150 150 168 T 300 150 T 400 160 V230 H0Z" fill="#0f2c22"/><path d="M0 200 Q 110 176 210 194 T 400 184 V230 H0Z" fill="#0a2019"/>' +
@@ -446,7 +480,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     h += '<div class="stack"><button data-act="aller" data-e="general">Classement général</button><button data-act="aller" data-e="historique">Feuilles enregistrées (' + n + ')</button></div>';
     h += '<button class="ghost" data-act="aller" data-e="club">Espace club</button>';
     h += '<button class="ghost" data-act="skin">Affichage : passer en ' + (st.skin === 'sombre' ? 'clair' : 'sombre') + '</button>';
-    h += '<p class="small muted">' + (sync === 'ok' ? 'Les feuilles sont partagées entre les téléphones connectés.' : 'Les feuilles sont gardées sur ce téléphone.') + ' La liste des licenciés est tenue par le club.' + '</p>';
+    h += '<p class="small muted">' + (sync === 'ok' ? 'Les feuilles sont partagées avec tout le club.' : HORS ? 'Hors ligne : les feuilles seront envoyées au club au retour du réseau.' : 'Les feuilles sont gardées sur ce téléphone.') + ' La liste des licenciés est tenue par le club.' + '</p>';
     return h;
   }
   function vPlanche() {
@@ -699,7 +733,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     var b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
     var a = b.dataset.act, s;
     if (a !== 'suppr' && a !== 'dellic' && a !== 'fdel') st.suppr = null;
-    if (a === 'aller') { st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; if (st.ecran !== 'club') st.clubOk = false; }
+    if (a === 'aller') { if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; if (st.ecran !== 'club') st.clubOk = false; }
     else if (a === 'clubin') { var cp = document.getElementById('cpass'); if (cp && cp.value === CLUB_PASS) { st.clubOk = true; st.msg = ''; } else st.msg = 'Mot de passe incorrect.'; }
     else if (a === 'fnew') { st.fiche = ''; st.msg = ''; }
     else if (a === 'fedit') { st.fiche = b.dataset.id; st.msg = ''; }
