@@ -251,7 +251,8 @@ input[type=password],input[type=tel],input[type=email]{font:inherit;color:var(--
 .vsw i{display:block;width:34px;height:20px;border-radius:99px;background:rgba(127,127,127,.45);position:relative;transition:background .15s}
 .vsw i:after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s}
 .vsw.on{color:inherit}.vsw.on i{background:var(--accent)}.vsw.on i:after{left:16px}
-.tirv .vsw{margin:-6px 0 -8px}
+.vgrp{display:inline-flex;align-items:center;gap:2px;align-self:flex-end}
+.tirv .vgrp{margin:-6px 0 -8px}
 .tirv{display:flex;flex-direction:column;gap:10px;margin-top:-8px}
 .tirv .syn{height:clamp(130px,calc(100dvh - 500px),280px)}
 .tirv .now{padding:14px 18px;border-radius:24px}
@@ -627,8 +628,11 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   // voix : annonces parlées par le téléphone (synthèse vocale intégrée), coupées par défaut
   st.voix = lget('btc.voix', false);
-  function dire(t) { if (!st.voix || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return; try { speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(t); u.lang = 'fr-FR'; u.rate = 1.05; var v = (speechSynthesis.getVoices() || []).filter(function (x) { return /^fr/i.test(x.lang); })[0]; if (v) u.voice = v; speechSynthesis.speak(u); } catch (e) {} }
-  function voixSw() { return window.speechSynthesis ? '<button class="link vsw' + (st.voix ? ' on' : '') + '" data-act="voix" role="switch" aria-checked="' + (st.voix ? 'true' : 'false') + '"><i></i>Voix</button>' : ''; }
+  function dire(t) { if (!st.voix || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return; try { speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(t); u.lang = 'fr-FR'; u.rate = 1.05; var L = voixFr(), v = L.filter(function (x) { return x.name === st.voixNom; })[0] || L[0]; if (v) u.voice = v; speechSynthesis.speak(u); } catch (e) {} }
+  st.voixNom = lget('btc.voixNom', '');
+  function voixFr() { var L = []; try { L = (speechSynthesis.getVoices() || []).filter(function (x) { return /^fr/i.test(x.lang); }); } catch (e) {} return L.sort(function (a, b) { return (/fr[-_]FR/i.test(b.lang) - /fr[-_]FR/i.test(a.lang)) || a.name.localeCompare(b.name); }); }
+  try { if (window.speechSynthesis) { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = function () { if (st.voix && (st.ecran === 'accueil' || st.ecran === 'tir' || st.ecran === 'direct')) render(); }; } } catch (e) {}
+  function voixSw() { return window.speechSynthesis ? '<span class="vgrp">' + (st.voix && voixFr().length > 1 ? '<button class="link" style="font-size:13px;min-height:32px;width:auto;padding:4px 6px" data-act="voixsuiv">Changer de voix</button>' : '') + '<button class="link vsw' + (st.voix ? ' on' : '') + '" data-act="voix" role="switch" aria-checked="' + (st.voix ? 'true' : 'false') + '"><i></i>Voix</button></span>' : ''; }
   function direTireur() { var c = st.cours; if (!c) return; var e = etat(c); if (e.fini || e.rotation) return; dire(c.tireurs[e.i].nom + ', poste ' + e.poste); }
   var prochDit = '';
   function direProch() { if (!st.voix || st.ecran !== 'direct') return; var t = [['DTL', 'A'], ['FU', 'B'], ['DTL', 'C']].map(function (q) { var w = enCoursAu(q[0], q[1]).filter(function (x) { return !etat(x.s).n; }); return w.length ? 'Prochaine planche au ' + nomPas(q[0], q[1]) + ' : ' + w[0].s.tireurs.map(function (x) { return x.nom; }).join(', ') : ''; }).filter(function (x) { return x; }).join('. '); if (t && t !== prochDit) dire(t); prochDit = t; }
@@ -1327,6 +1331,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (a !== 'suppr' && a !== 'dellic' && a !== 'fdel' && a !== 'sesdel' && a !== 'seldel') st.suppr = null;
     if (a === 'aller' && b.dataset.e !== 'membre') st.apres = null;
     if (a === 'grille') { var ge = document.getElementById('gr' + b.dataset.i); if (ge) ge.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    if (a === 'voixsuiv') { var VL = voixFr(); if (VL.length) { var vi = 0; VL.forEach(function (x, i) { if (x.name === st.voixNom) vi = i; }); vi = (vi + 1) % VL.length; st.voixNom = VL[vi].name; lset('btc.voixNom', st.voixNom); dire('Voix ' + (vi + 1) + ' sur ' + VL.length + '. Paul Durand, poste 2.'); } return; }
     if (a === 'voix') { st.voix = !st.voix; lset('btc.voix', st.voix); if (st.voix) { dire('Voix activée'); prochDit = ''; } else { try { speechSynthesis.cancel(); } catch (e) {} } render(); return; }
     if (a === 'secu') { st.retourS = b.dataset.r || 'accueil'; st.ecran = 'securite'; window.scrollTo(0, 0); }
     if (a === 'aller') { if (b.dataset.e === 'concours') { fbConc(); st.cedit = null; } if (b.dataset.e === 'direct') dirGo(); if (b.dataset.e === 'accueil') fbDirect(); if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; }
