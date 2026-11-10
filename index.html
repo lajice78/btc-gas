@@ -240,6 +240,17 @@ input[type=password],input[type=tel],input[type=email]{font:inherit;color:var(--
 .hero.on3d .wm em{display:inline;margin-left:6px;padding:0}
 .hero.on3d .sub{position:absolute;left:20px;bottom:14px;margin:0;color:#fff;letter-spacing:2px;text-shadow:0 1px 6px rgba(0,0,0,.6)}
 .hero.on3d .pill{left:auto;right:14px;top:16px}
+.mur{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
+#app.large{max-width:1500px}
+.dir{display:grid;grid-template-columns:1fr repeat(5,30px) 62px;gap:8px 6px;align-items:center;font-variant-numeric:tabular-nums}
+.dir .lab{font-size:12px;color:var(--muted);text-align:center}
+.dir .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dir .nm small{display:block;font-size:12px;font-weight:700;color:var(--accent-ink)}
+.dir .nm.on{color:var(--accent-ink);font-weight:800}
+.dir .c{text-align:center;height:30px;line-height:30px;border-radius:8px;background:var(--surface2);border:1px solid var(--line);font-size:14px}
+.dir .t{text-align:right;font-family:var(--display);font-weight:900;font-size:22px}
+.dir .t small{font-size:12px;color:var(--muted);font-weight:700}
+@media(min-width:900px){#app.large .dir{font-size:19px}#app.large .dir .t{font-size:30px}#app.large .card h2{font-size:24px}}
 .hero .ign{position:absolute;right:10px;bottom:6px;z-index:3;font-size:9px;letter-spacing:.3px;color:rgba(255,255,255,.75);text-shadow:0 1px 3px rgba(0,0,0,.7)}
 .hero.on3d .pin{display:flex;visibility:hidden;position:absolute;z-index:4;transform:translate(-50%,-100%);flex-direction:column;align-items:center;gap:0;min-height:0;padding:7px 14px 8px;border-radius:16px;border:2px solid #fff;background:linear-gradient(180deg,var(--accent2),var(--accent));color:#1b0d04;font-family:var(--display);font-weight:900;font-size:17px;line-height:1.05;box-shadow:0 8px 22px rgba(0,0,0,.4)}
 .hero.on3d .pin small{font-family:var(--body);font-weight:700;font-size:11px;letter-spacing:.5px;text-transform:uppercase}
@@ -306,7 +317,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   var CLUB_MAIL = ''; // adresse de la boîte du club (à renseigner)
   var HORS = !(window.claude && window.claude.use); // version hébergée, hors Claude
   var app = document.getElementById('app');
-  var st = { ecran: 'accueil', lic: {}, ses: {}, cours: null, planche: null, vue: null, edit: false, msg: '', copie: '', suppr: null, gdisc: 'DTL', clubOk: false, fiche: null };
+  var st = { ecran: 'accueil', lic: {}, ses: {}, cours: null, planche: null, vue: null, edit: false, msg: '', copie: '', suppr: null, gdisc: 'DTL', gtype: 'moy', gqui: 'tous', gmin: true, direct: {}, clubOk: false, fiche: null };
   var db = null, dl = null, sync = 'attente', heroAnim = true, ecranVu = '';
 
   /* ---- stockage local (confort, peut manquer) ---- */
@@ -369,6 +380,12 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       fbVu = Date.now(); fbCours = false; sync = 'ok'; saveLocal(); if (st.ecran !== 'tir' && st.ecran !== 'planche' && st.ecran !== 'club') render();
     }).catch(function () { fbCours = false; if (sync !== 'ok') { sync = 'local'; render(); } });
   }
+  /* ---- planches en cours, visibles en direct au club-house ---- */
+  var dirT = null, DIRECT_ON = false;
+  function vivre() { var s = st.cours; if (!HORS || !DIRECT_ON || !s) return; fetch(FB + 'direct/' + encodeURIComponent(s.id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: fbEnc({ disc: s.disc, pas: s.pas || '', date: s.date, maj: Date.now(), tireurs: s.tireurs, tirs: s.tirs }).mapValue.fields }) }).catch(function () {}); }
+  function mort(id) { if (!HORS || !DIRECT_ON || !id) return; fetch(FB + 'direct/' + encodeURIComponent(id), { method: 'DELETE' }).catch(function () {}); }
+  function fbDirect() { if (!HORS) return; fbListe('direct', '', {}).then(function (d) { st.direct = d; if (st.ecran === 'direct') render(); }).catch(function () {}); }
+  function dirGo() { if (!HORS || dirT) return; fbDirect(); dirT = setInterval(function () { if (st.ecran !== 'direct') { clearInterval(dirT); dirT = null; return; } if (!document.hidden) { fbDirect(); fbSync(false); } }, 6000); }
   function pousser(col, id, body) { if (HORS) { fbSet(col, col === 'sessions' ? 'ses' : 'lic', id); return; } if (!db) return; db.collection(col).doc(id).set(body).catch(function () {}); }
   function retirer(col, id) { if (HORS) { fetch(FB + col + '/' + encodeURIComponent(id), { method: 'DELETE', headers: fbTete() }).catch(function () {}); if (col === 'licencies') fetch(FB + 'fiches/' + encodeURIComponent(id), { method: 'DELETE', headers: fbTete() }).catch(function () {}); return; } if (!db) return; db.collection(col).doc(id).delete().catch(function () {}); }
   function fusion(col, cle, snap, corps) {
@@ -406,7 +423,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
 
   /* ---- actions ---- */
   function ajouterLic(nom) { nom = nom.trim().replace(/\s+/g, ' '); if (!nom) return; var id = slug(nom); if (st.lic[id]) return; st.lic[id] = { nom: nom }; saveLocal(); pousser('licencies', id, { nom: nom }); }
-  function nouvellePlanche(disc, noms) { var n = MAXT[disc], a = []; for (var i = 0; i < n; i++) a.push((noms && noms[i]) || ''); st.planche = { disc: disc, noms: a, memo: {} }; st.msg = ''; st.ecran = 'planche'; }
+  function nouvellePlanche(disc, noms, pas) { var n = MAXT[disc], a = []; for (var i = 0; i < n; i++) a.push((noms && noms[i]) || ''); st.planche = { disc: disc, noms: a, memo: {}, pas: pas || '' }; st.msg = ''; st.ecran = 'planche'; }
   function demarrer() {
     var p = st.planche, tireurs = [], vus = {};
     for (var i = 0; i < p.noms.length; i++) {
@@ -416,18 +433,18 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       tireurs.push({ nom: connu ? st.lic[id].nom : nom, statut: connu ? 'licencie' : 'invite' });
     }
     if (!tireurs.length) { st.msg = 'Inscrivez au moins un tireur.'; return render(); }
-    st.cours = { id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), disc: p.disc, date: Date.now(), tireurs: tireurs, tirs: [], ack: 0 };
-    saveLocal(); st.ecran = 'tir'; render();
+    st.cours = { id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), disc: p.disc, pas: p.pas || '', date: Date.now(), tireurs: tireurs, tirs: [], ack: 0 };
+    saveLocal(); vivre(); st.ecran = 'tir'; render();
   }
   function noter(r) {
     var s = st.cours; if (!s || etat(s).fini) return;
     var e0 = etat(s); if (SY) { try { SY.tir(e0.i, e0.poste, r, s.disc); } catch (e) {} }
     s.tirs.push(r);
-    if (etat(s).fini) terminer(); else { saveLocal(); render(); }
+    if (etat(s).fini) terminer(); else { saveLocal(); vivre(); render(); }
   }
   function flash(r, disc) { try { var f = document.createElement('div'); f.className = 'flash f' + r; f.textContent = disc === 'DTL' ? (r === 1 ? '3' : r === 2 ? '2' : '0') : (r ? '1' : '0'); document.body.appendChild(f); setTimeout(function () { f.remove(); }, 540); } catch (e) {} }
   function terminer() {
-    var s = st.cours; s.termine = true; st.ses[s.id] = s; st.cours = null; saveLocal();
+    var s = st.cours; s.termine = true; st.ses[s.id] = s; st.cours = null; saveLocal(); mort(s.id);
     pousser('sessions', s.id, corpsSes(s)); st.vue = s.id; st.edit = false; st.copie = ''; st.ecran = 'resultat'; render();
   }
   function resume(s) {
@@ -508,13 +525,14 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       '<rect x="222" y="194" width="30" height="10" rx="2" fill="#06140e"/>' +
       '<g transform="translate(318 64) rotate(-16)"><g class="' + (heroAnim ? 'vol' : '') + '"><ellipse cx="0" cy="7" rx="44" ry="13" fill="#9c3306"/><ellipse cx="0" cy="0" rx="44" ry="13" fill="#ff6a1f"/><ellipse cx="0" cy="-3" rx="27" ry="7.5" fill="#ff8a4a"/><ellipse cx="0" cy="-5" rx="12" ry="3.2" fill="#ffc09a"/></g></g>' +
       '<g class="' + (heroAnim ? 'eclat' : '') + '" fill="#ffa24a"><path d="M262 120l13-5-3 12z"/><path d="M284 142l9 2-6 7z" opacity=".8"/><path d="M246 144l6-8 5 9z" opacity=".6"/></g>' +
-      '</svg>' + p + '<button class="pin" data-pin="0" data-act="nouv" data-d="DTL">DTL<small>pas A</small></button><button class="pin bas" data-pin="1" data-act="nouv" data-d="FU">FU<small>fosse B</small></button><button class="pin" data-pin="2" data-act="nouv" data-d="DTL">DTL<small>pas C</small></button><button class="pin bas clair" data-pin="3" data-act="aller" data-e="general">Scores<small>club-house</small></button><span class="wm">BTC<em>GAS</em></span><span class="sub">Feuille de marque DTL · FU</span></div>'; heroAnim = false;
+      '</svg>' + p + '<button class="pin" data-pin="0" data-act="nouv" data-d="DTL" data-p="A">DTL<small>pas A</small></button><button class="pin bas" data-pin="1" data-act="nouv" data-d="FU" data-p="B">FU<small>fosse B</small></button><button class="pin" data-pin="2" data-act="nouv" data-d="DTL" data-p="C">DTL<small>pas C</small></button><button class="pin bas clair" data-pin="3" data-act="aller" data-e="general">Scores<small>club-house</small></button><span class="wm">BTC<em>GAS</em></span><span class="sub">Feuille de marque DTL · FU</span></div>'; heroAnim = false;
     if (st.cours) { var e = etat(st.cours); h += '<div class="card"><h2>Planche en cours</h2><p>' + st.cours.disc + ', ' + st.cours.tireurs.length + ' tireur(s), ' + e.n + ' tirs notés sur ' + e.total + '.</p><div class="row"><button class="primary" data-act="aller" data-e="tir">Reprendre</button><button data-act="abandon">Abandonner</button></div></div>'; }
     h += '<div class="stack"><div class="disc">' +
       '<button data-act="nouv" data-d="DTL"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M60 14L22 2"/><path d="M60 14V0"/><path d="M60 14L98 2"/></g><rect x="52" y="12" width="16" height="7" rx="2" fill="#ff6a1f"/><g fill="currentColor"><circle cx="16" cy="40" r="5"/><circle cx="38" cy="47" r="5"/><circle cx="60" cy="50" r="5"/><circle cx="82" cy="47" r="5"/><circle cx="104" cy="40" r="5"/></g></svg><b>DTL</b><span>5 tireurs, 5 plateaux par poste<br>3 pts / 2 pts / 0</span></button>' +
       '<button data-act="nouv" data-d="FU"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M16 14L4 0"/><path d="M38 14L46 0"/><path d="M60 14V0"/><path d="M82 14L72 0"/><path d="M104 14L116 0"/></g><g fill="#ff6a1f"><rect x="10" y="12" width="12" height="7" rx="2"/><rect x="32" y="12" width="12" height="7" rx="2"/><rect x="54" y="12" width="12" height="7" rx="2"/><rect x="76" y="12" width="12" height="7" rx="2"/><rect x="98" y="12" width="12" height="7" rx="2"/></g><g fill="currentColor"><circle cx="16" cy="48" r="5"/><circle cx="38" cy="48" r="5"/><circle cx="60" cy="48" r="5"/><circle cx="82" cy="48" r="5"/><circle cx="104" cy="48" r="5"/></g></svg><b>FU</b><span>Fosse universelle, 6 tireurs<br>1 pt par plateau cassé</span></button></div></div>';
     var n = Object.keys(st.ses).length, l = Object.keys(st.lic).length;
     h += '<div class="stack"><button data-act="aller" data-e="general">Classement général</button><button data-act="aller" data-e="historique">Feuilles enregistrées (' + n + ')</button></div>';
+    if (HORS && DIRECT_ON) h += '<button data-act="aller" data-e="direct">En direct : planches en cours</button>';
     h += '<button class="ghost" data-act="aller" data-e="club">Espace administrateur</button>';
     h += '<button class="ghost" data-act="skin">Affichage : passer en ' + (st.skin === 'sombre' ? 'clair' : 'sombre') + '</button>';
     h += '<p class="small muted">' + (sync === 'ok' ? 'Les feuilles sont partagées avec tout le club.' : HORS ? 'Hors ligne : les feuilles seront envoyées au club au retour du réseau.' : 'Les feuilles sont gardées sur ce téléphone.') + ' La liste des licenciés est tenue par l\'administrateur.' + '</p>';
@@ -576,22 +594,56 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     h += '</div>';
     return h;
   }
-  function general(disc) {
-    var m = {};
-    Object.keys(st.ses).forEach(function (id) { var s = st.ses[id]; if (s.disc !== disc) return;
-      bilan(s).forEach(function (x) { var k = slug(x.nom), o = m[k] || (m[k] = { nom: x.nom, n: 0, tot: 0, best: 0, inv: true }); o.n++; o.tot += x.total; if (x.total > o.best) o.best = x.total; if (s.tireurs[x.i].statut !== 'invite') o.inv = false; }); });
-    var a = Object.keys(m).map(function (k) { m[k].moy = m[k].tot / m[k].n; return m[k]; });
-    a.sort(function (p, q) { return q.moy - p.moy || q.best - p.best || q.n - p.n || p.nom.localeCompare(q.nom, 'fr'); });
-    a.forEach(function (o, j) { o.rang = (j > 0 && a[j - 1].moy === o.moy) ? a[j - 1].rang : j + 1; });
+  var GT = [['moy', 'Moyenne'], ['best4', '4 meilleures'], ['assid', 'Assiduité'], ['record', 'Record'], ['prog', 'Progression'], ['mois', 'Du mois']];
+  function general(disc, type, qui, min3) {
+    type = type || 'moy'; var m = {}, now = new Date(), m0 = new Date(now.getFullYear(), now.getMonth(), 1).getTime(), add = function (p, q) { return p + q; };
+    Object.keys(st.ses).forEach(function (id) { var s = st.ses[id]; if (s.disc !== disc || (type === 'mois' && s.date < m0)) return;
+      bilan(s).forEach(function (x) { var k = slug(x.nom), o = m[k] || (m[k] = { nom: x.nom, n: 0, tot: 0, best: 0, inv: true, L: [] }); o.n++; o.tot += x.total; if (x.total > o.best) o.best = x.total; if (s.tireurs[x.i].statut !== 'invite') o.inv = false; o.L.push([s.date, x.total]); }); });
+    var a = Object.keys(m).map(function (k) {
+      var o = m[k]; o.moy = o.tot / o.n; o.L.sort(function (p, q) { return p[0] - q[0]; }); var t = o.L.map(function (e) { return e[1]; }), d = t.slice().sort(function (p, q) { return q - p; });
+      o.b4 = d.slice(0, 4).reduce(add, 0); o.prog = o.n >= 6 ? (t.slice(-3).reduce(add, 0) - t.slice(0, 3).reduce(add, 0)) / 3 : 0;
+      o.v = type === 'best4' ? o.b4 : type === 'assid' ? o.tot : type === 'record' ? o.best : type === 'prog' ? o.prog : o.moy;
+      o.ok = type === 'prog' ? o.n >= 6 : (type === 'moy' && min3 ? o.n >= 3 : true); return o; });
+    if (qui === 'lic') a = a.filter(function (o) { return !o.inv; }); else if (qui === 'inv') a = a.filter(function (o) { return o.inv; });
+    a.sort(function (p, q) { return (q.ok - p.ok) || (p.ok ? q.v - p.v : 0) || q.best - p.best || q.n - p.n || p.nom.localeCompare(q.nom, 'fr'); });
+    a.forEach(function (o, j) { o.rang = !o.ok ? 0 : (j > 0 && a[j - 1].ok && a[j - 1].v === o.v) ? a[j - 1].rang : j + 1; });
     return a;
   }
   function vGeneral() {
-    var d = st.gdisc, a = general(d), mx = maxPts(d);
+    var d = st.gdisc, ty = st.gtype, a = general(d, ty, st.gqui, st.gmin), mx = maxPts(d), dec = function (v) { return (Math.round(v * 10) / 10).toString().replace('.', ','); };
+    var bt = function (act, k, v, cur, lab) { return '<button' + (cur === v ? ' class="primary"' : '') + ' data-act="' + act + '" data-' + k + '="' + v + '">' + lab + '</button>'; };
     var h = entete('Classement', 'accueil') + '<div class="row"><button style="flex:1"' + (d === 'DTL' ? ' class="primary"' : '') + ' data-act="gdisc" data-d="DTL">DTL</button><button style="flex:1"' + (d === 'FU' ? ' class="primary"' : '') + ' data-act="gdisc" data-d="FU">FU</button></div>';
-    if (!a.length) return h + '<p class="muted">Aucune série ' + d + ' enregistrée pour le moment.</p>';
-    h += '<div class="card"><h2>Classement général ' + d + '</h2>';
-    a.forEach(function (o) { h += '<div class="rank' + (o.rang === 1 ? ' first' : '') + '"><span class="rg">' + o.rang + '</span><span><b>' + esc(o.nom) + '</b><br><span class="small muted">' + o.n + ' série' + (o.n > 1 ? 's' : '') + ' · meilleure ' + o.best + ' · total ' + o.tot + (o.inv ? ' · invité' : '') + '</span></span><span class="sc">' + (Math.round(o.moy * 10) / 10).toString().replace('.', ',') + '<small>/' + mx + '</small></span></div>'; });
-    return h + '</div><p class="small muted">Classé sur la moyenne par série de 25 plateaux, toutes feuilles enregistrées confondues.</p>';
+    h += '<div class="chips">' + GT.map(function (g) { return bt('gtype', 't', g[0], ty, g[1]); }).join('') + '</div>';
+    h += '<div class="chips">' + bt('gqui', 'q', 'tous', st.gqui, 'Tous') + bt('gqui', 'q', 'lic', st.gqui, 'Licenciés') + bt('gqui', 'q', 'inv', st.gqui, 'Invités') + (ty === 'moy' ? '<button' + (st.gmin ? ' class="primary"' : '') + ' data-act="gmin">3 séries minimum</button>' : '') + '</div>';
+    var expl = { moy: 'Classé sur la moyenne par série de 25 plateaux' + (st.gmin ? ', à partir de 3 séries' : '') + '.', best4: 'Classé sur le total des 4 meilleures séries.', assid: 'Classé sur le total de points cumulés : plus on tire, plus on monte.', record: 'Classé sur la meilleure série.', prog: 'Classé sur la progression : moyenne des 3 dernières séries moins moyenne des 3 premières, à partir de 6 séries.', mois: 'Classé sur la moyenne par série, séries du mois en cours uniquement.' }[ty];
+    if (!a.length) return h + '<p class="muted">Aucune série ' + d + ' à classer ici pour le moment.</p><p class="small muted">' + expl + '</p>';
+    function ligne(o) {
+      var val = ty === 'best4' ? o.b4 + '<small>/' + (4 * mx) + '</small>' : ty === 'assid' ? o.tot + '<small> pts</small>' : ty === 'record' ? o.best + '<small>/' + mx + '</small>' : ty === 'prog' ? (o.ok ? (o.prog > 0 ? '+' : '') + dec(o.prog) + '<small> pts</small>' : '-') : dec(o.moy) + '<small>/' + mx + '</small>';
+      return '<div class="rank' + (o.rang === 1 ? ' first' : '') + '"><span class="rg">' + (o.rang || '-') + '</span><span><b>' + esc(o.nom) + '</b><br><span class="small muted">' + o.n + ' série' + (o.n > 1 ? 's' : '') + ' · meilleure ' + o.best + ' · moyenne ' + dec(o.moy) + ' · total ' + o.tot + (o.inv ? ' · invité' : '') + '</span></span><span class="sc">' + val + '</span></div>';
+    }
+    var ok = a.filter(function (o) { return o.ok; }), non = a.filter(function (o) { return !o.ok; });
+    h += '<div class="card"><h2>' + GT.filter(function (g) { return g[0] === ty; })[0][1] + ' ' + d + '</h2>' + (ok.length ? ok.map(ligne).join('') : '<p class="muted">Personne n\'a encore assez de séries.</p>') + '</div>';
+    if (non.length) h += '<div class="card"><h2>Pas encore classés</h2>' + non.map(ligne).join('') + '</div>';
+    return h + '<p class="small muted">' + expl + '</p>';
+  }
+  function vDirect() {
+    var now = Date.now(), ordre = { A: 1, B: 2, C: 3 }, L = Object.keys(st.direct || {}).map(function (id) { return st.direct[id]; }).filter(function (s) { return s && s.maj > now - 45 * 60000 && s.tireurs && s.tireurs.length && s.tirs && s.tirs.length < s.tireurs.length * NB; });
+    L.sort(function (p, q) { return (ordre[p.pas] || 9) - (ordre[q.pas] || 9) || p.date - q.date; });
+    var h = entete('En direct', 'accueil');
+    if (!HORS) return h + '<p class="muted">Le direct fonctionne sur la version ouverte par le QR code.</p>';
+    if (!L.length) h += '<div class="card"><h2>Aucune planche en cours</h2><p class="muted">Les planches apparaissent ici dès qu\'elles démarrent, et se mettent à jour à chaque tir.</p></div>';
+    h += '<div class="mur">';
+    L.forEach(function (s) {
+      var e = etat(s), b = bilan(s), mx = maxPts(s.disc), der = s.tirs.length ? s.tirs[s.tirs.length - 1] : null, qui = s.tirs.length ? s.tireurs[(s.tirs.length - 1) % e.N].nom : '';
+      h += '<div class="card"><h2>' + s.disc + (s.pas ? ' · ' + (s.disc === 'FU' ? 'Fosse ' : 'Pas ') + s.pas : '') + '<span class="small muted" style="float:right;font-weight:500">plateau ' + Math.min(NB, e.k + 1) + '/' + NB + '</span></h2>';
+      h += '<div class="dir"><span></span><span class="lab">1</span><span class="lab">2</span><span class="lab">3</span><span class="lab">4</span><span class="lab">5</span><span class="lab">Total</span>';
+      b.forEach(function (x) { var on = x.i === e.i; h += '<span class="nm' + (on ? ' on' : '') + '">' + esc(x.nom) + (on ? '<small>poste ' + e.poste + '</small>' : '') + '</span>'; for (var g = 0; g < 5; g++) h += '<span class="c">' + (x.marks[g * 5] === null ? '' : x.series[g]) + '</span>'; h += '<span class="t">' + x.total + '<small>/' + mx + '</small></span>'; });
+      h += '</div>' + (der === null ? '' : '<p class="small muted">Dernier tir : ' + esc(qui) + ', ' + (der === 1 ? 'cassé au 1er coup' : der === 2 ? 'cassé au 2e coup' : 'raté') + '.</p>') + '</div>';
+    });
+    h += '</div>';
+    var j0 = new Date(); j0.setHours(0, 0, 0, 0); var fin = Object.keys(st.ses).map(function (id) { return st.ses[id]; }).filter(function (s) { return s.date >= j0.getTime(); }).sort(function (p, q) { return q.date - p.date; }).slice(0, 6);
+    if (fin.length) { h += '<div class="card"><h2>Séries terminées aujourd\'hui</h2><div class="mur">'; fin.forEach(function (s) { h += '<div><b>' + s.disc + ' · ' + fdate(s.date).slice(11) + '</b>' + classement(s).slice(0, 3).map(function (x) { return '<div class="small">' + x.rang + '. ' + esc(x.nom) + ' <b>' + x.total + '</b>/' + maxPts(s.disc) + '</div>'; }).join('') + '</div>'; }); h += '</div></div>'; }
+    return h;
   }
   function vHisto() {
     var ids = Object.keys(st.ses).sort(function (a, b) { return st.ses[b].date - st.ses[a].date; });
@@ -634,8 +686,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     return h + '</div>';
   }
   function render() {
-    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral }[st.ecran] || vAccueil;
-    app.innerHTML = v();
+    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral, direct: vDirect }[st.ecran] || vAccueil;
+    app.innerHTML = v(); app.classList.toggle('large', st.ecran === 'direct');
     if (st.ecran !== ecranVu) { ecranVu = st.ecran; app.classList.remove('in'); void app.offsetWidth; app.classList.add('in'); }
     hero3d(); syn3d();
   }
@@ -698,11 +750,11 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     function dSeg(x, z, ax, az, bx, bz) { var dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz))); return Math.hypot(x - ax - t * dx, z - az - t * dz); }
     // distance (m) à l'extérieur du fond de carrière : cuvette + couloir d'accès à l'ouest
     function dehors(x, z) { var e = Math.hypot((x - 30) / 72, (z + 5) / 86), dE = (e - 1) * 78, dS = dSeg(x, z, -45, 58, 50, 62) - 22, dC = Math.min(dSeg(x, z, -25, 25, -56, 35), dSeg(x, z, -56, 35, -120, 10)) - 8; return Math.min(dE, dS, dC); }
-    function haut(x, z) { return HR * sm(0, 14, dehors(x, z)); }
-    var HR = 7, gProc = new T.Group(), gArb = null, photo = false; sc.add(gProc);
+    function haut(x, z) { return HR * sm(0, 12, dehors(x, z)); }
+    var HR = 14, gProc = new T.Group(), gArb = null, photo = false; sc.add(gProc);
     var tg = new T.PlaneGeometry(320, 300, 96, 90); tg.rotateX(-Math.PI / 2); var tp = tg.attributes.position, tc = new Float32Array(tp.count * 3);
     for (var a = 0; a < tp.count; a++) {
-      var x = tp.getX(a), z = tp.getZ(a), d = dehors(x, z), h = HR * sm(0, 14, d), n = 0.5 + 0.5 * Math.sin(x * 0.21 + z * 0.13) * Math.cos(z * 0.17 - x * 0.05), cr, cg, cb;
+      var x = tp.getX(a), z = tp.getZ(a), d = dehors(x, z), h = HR * sm(0, 12, d), n = 0.5 + 0.5 * Math.sin(x * 0.21 + z * 0.13) * Math.cos(z * 0.17 - x * 0.05), cr, cg, cb;
       if (d <= 0) { cr = 0.30 + 0.08 * n; cg = 0.50 + 0.08 * n; cb = 0.24; }                      // herbe du fond
       else if (d < 13) { var f = sm(3, 11, d); cr = 0.80 - 0.42 * f; cg = 0.74 - 0.22 * f; cb = 0.56 - 0.30 * f; } // front calcaire puis talus
       else { var champ = Math.sin(x * 0.045) + Math.cos(z * 0.06 + x * 0.02); if (champ > 0.35) { cr = 0.66; cg = 0.60; cb = 0.38; } else if (champ < -0.5) { cr = 0.42; cg = 0.60; cb = 0.26; } else { cr = 0.33; cg = 0.52; cb = 0.25; } }
@@ -715,7 +767,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     og.setIndex(oj); var loin = new T.Mesh(og, M(0x4f7a3a, { roughness: 1 })); loin.position.y = HR - 0.05; sc.add(loin);
     // arbres sur le pourtour
     var seed = 7, liste = []; function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
-    for (var k = 0; k < 900; k++) { var tx = -155 + rnd() * 310, tz = -145 + rnd() * 290, dd = dehors(tx, tz); if (dd < 4 || dd > 34) continue; liste.push({ x: tx, y: haut(tx, tz), z: tz, s: 2.4 + rnd() * 2.2 }); }
+    for (var k = 0; k < 900; k++) { var tx = -155 + rnd() * 310, tz = -145 + rnd() * 290, dd = dehors(tx, tz); if (dd < 11 || dd > 40) continue; liste.push({ x: tx, y: haut(tx, tz), z: tz, s: 2.4 + rnd() * 2.2 }); }
     gArb = K.arbres(sc, liste);
     // chemin d'accès, parking, route à l'est
     function bande(x1, z1, x2, z2, w, y, c) { var L = Math.hypot(x2 - x1, z2 - z1), m = new T.Mesh(new T.BoxGeometry(L, 0.12, w), c === 'g' ? K.MT('gravier', L / 5, w / 5) : M(c)); m.receiveShadow = true; m.position.set((x1 + x2) / 2, y, (z1 + z2) / 2); m.rotation.y = -Math.atan2(z2 - z1, x2 - x1); gProc.add(m); }
@@ -764,7 +816,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
         var c = document.createElement('canvas'); c.width = 320; c.height = 300; var g = c.getContext('2d'); g.drawImage(im, 0, 0, 320, 300); var d = g.getImageData(0, 0, 320, 300).data, l2 = [], sd2 = 31, r2 = function () { sd2 = (sd2 * 16807) % 2147483647; return sd2 / 2147483647; };
         for (var gz = -146; gz < 147; gz += 5) for (var gx = -156; gx < 157; gx += 5) {
           var x = gx + (r2() - 0.5) * 4, z = gz + (r2() - 0.5) * 4, i = (Math.round(z + 150) * 320 + Math.round(x + 160)) * 4, R0 = d[i], G0 = d[i + 1], B0 = d[i + 2], pres = false;
-          if ((R0 + G0 + B0) / 3 > 92 || G0 - B0 < 8 || G0 - R0 < 4 || dehors(x, z) > 50) continue;
+          if ((R0 + G0 + B0) / 3 > 92 || G0 - B0 < 8 || G0 - R0 < 4 || dehors(x, z) > 50 || dehors(x, z) < 10) continue;
           PAS.forEach(function (p) { if (Math.hypot(x - p.b[0], z - p.b[1]) < 11 || Math.hypot(x - p.t[0], z - p.t[1]) < 6) pres = true; }); if (pres || Math.hypot(x - CH[0], z - CH[1]) < 11) continue;
           l2.push({ x: x, y: haut(x, z), z: z, s: 2.5 + r2() * 1.9 });
         }
@@ -928,7 +980,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     var b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
     var a = b.dataset.act, s;
     if (a !== 'suppr' && a !== 'dellic' && a !== 'fdel' && a !== 'sesdel') st.suppr = null;
-    if (a === 'aller') { if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; }
+    if (a === 'aller') { if (b.dataset.e === 'direct') dirGo(); if (b.dataset.e === 'general' || b.dataset.e === 'historique' || b.dataset.e === 'accueil') fbSync(false); st.ecran = b.dataset.e; st.msg = ''; st.edit = false; st.fiche = null; }
     else if (a === 'clublock') { jeton = null; st.clubOk = false; st.edit = false; st.ecran = 'accueil'; }
     else if (a === 'sesdel') { st.suppr = st.vue; }
     else if (a === 'sesdelOk') { var sid = st.vue; delete st.ses[sid]; saveLocal(); retirer('sessions', sid); st.edit = false; st.ecran = 'historique'; }
@@ -948,25 +1000,28 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       else { var nid = slug(o.nom); if (nid !== st.fiche && st.lic[nid]) st.msg = 'Un licencié porte déjà ce nom.';
         else { if (st.fiche && st.fiche !== nid) { delete st.lic[st.fiche]; retirer('licencies', st.fiche); } st.lic[nid] = o; saveLocal(); pousser('licencies', nid, corpsLic(o)); st.fiche = null; st.msg = ''; } }
     }
-    else if (a === 'nouv') nouvellePlanche(b.dataset.d);
+    else if (a === 'nouv') nouvellePlanche(b.dataset.d, null, b.dataset.p);
     else if (a === 'chip') { var p = st.planche, j = p.noms.findIndex(function (n) { return !n.trim(); }); if (j >= 0) p.noms[j] = b.dataset.n; }
     else if (a === 'demarrer') return demarrer();
     else if (a === 'noter') return noter(+b.dataset.r);
-    else if (a === 'annuler') { s = st.cours; if (s && s.tirs.length) { if (SY) SY.stop(); s.tirs.pop(); s.ack = 0; if (etat(s).rotation) s.ack = s.tirs.length; saveLocal(); } }
+    else if (a === 'annuler') { s = st.cours; if (s && s.tirs.length) { if (SY) SY.stop(); s.tirs.pop(); s.ack = 0; if (etat(s).rotation) s.ack = s.tirs.length; saveLocal(); vivre(); } }
     else if (a === 'pret') { st.cours.ack = st.cours.tirs.length; saveLocal(); }
-    else if (a === 'abandon') { st.cours = null; saveLocal(); }
+    else if (a === 'abandon') { if (st.cours) mort(st.cours.id); st.cours = null; saveLocal(); }
     else if (a === 'voir') { st.vue = b.dataset.id; st.copie = ''; st.msg = ''; st.ecran = 'resultat'; }
     else if (a === 'suppr' || a === 'dellic') st.suppr = b.dataset.id;
         else if (a === 'dellicOk') { delete st.lic[b.dataset.id]; saveLocal(); retirer('licencies', b.dataset.id); }
     else if (a === 'addlic') { var n = document.getElementById('newlic'); ajouterLic(n.value); }
     else if (a === 'edit') st.edit = !st.edit;
     else if (a === 'gdisc') st.gdisc = b.dataset.d;
+    else if (a === 'gtype') st.gtype = b.dataset.t;
+    else if (a === 'gqui') st.gqui = b.dataset.q;
+    else if (a === 'gmin') st.gmin = !st.gmin;
     else if (a === 'xtout') { telecharger('btc-gas-feuilles-' + horodate() + '.csv', csvTout()); return; }
     else if (a === 'xgen') { telecharger('btc-gas-classement-' + horodate() + '.csv', csvGeneral()); return; }
     else if (a === 'xjson') { telecharger('btc-gas-sauvegarde-' + horodate() + '.json', jsonTout()); return; }
     else if (a === 'skin') { st.skin = st.skin === 'sombre' ? 'clair' : 'sombre'; lset('btc.skin2', st.skin); peau(); }
     else if (a === 'cell') { if (!st.edit || !st.clubOk) return; s = st.ses[st.vue]; var idx = (+b.dataset.k) * s.tireurs.length + (+b.dataset.i), r = s.tirs[idx]; s.tirs[idx] = r === 1 ? 2 : r === 2 ? 0 : 1; saveLocal(); pousser('sessions', st.vue, corpsSes(s)); }
-    else if (a === 'rejouer') { s = st.ses[st.vue]; nouvellePlanche(s.disc, s.tireurs.map(function (t) { return t.nom; })); }
+    else if (a === 'rejouer') { s = st.ses[st.vue]; nouvellePlanche(s.disc, s.tireurs.map(function (t) { return t.nom; }), s.pas); }
     else if (a === 'copier') { s = st.ses[st.vue]; var txt = resume(s); st.copie = 'Si la copie n\'a pas fonctionné, sélectionnez le texte ci-dessous.';
       try { navigator.clipboard.writeText(txt).then(function () { st.copie = 'Résultat copié. Collez-le dans un message ou un mail.'; render(); }, function () {}); } catch (e) {} }
     else if (a === 'mail') { s = st.ses[st.vue]; location.href = 'mailto:' + CLUB_MAIL + '?subject=' + encodeURIComponent('Feuille ' + s.disc + ' du ' + fdate(s.date)) + '&body=' + encodeURIComponent(resume(s)); return; }
@@ -978,7 +1033,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   });
 
   if (st.cours && st.cours.ack === undefined) st.cours.ack = 0;
-  render(); brancher();
+  if (HORS && DIRECT_ON && /[?&]direct/.test(location.search)) st.ecran = 'direct';
+  render(); brancher(); if (st.ecran === 'direct') dirGo();
 })();
 </script>
 </body>
