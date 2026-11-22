@@ -315,6 +315,15 @@ button.adm{align-self:center;min-height:0;padding:6px 10px;font-size:12px;opacit
 .hero.on3d .pin.clair{background:rgba(255,255,255,.8);color:#0c1f17;border-color:rgba(255,255,255,.95)}
 .hero.on3d + *{margin-top:0}
 #app.club3d .disc{display:none} /* les étiquettes de la maquette remplacent les deux gros boutons ; ils restent en secours sans 3D */
+
+/* grand ecran (mur de supervision, ordinateur) : la maquette du club occupe toute la fenetre */
+@media (min-width:900px){
+  #app.club3d{max-width:none;padding:0 0 10px;gap:8px}
+  #app.club3d .hero{margin:0;border-radius:0 0 28px 28px}
+  #app.club3d .hero.on3d{height:calc(100vh - 58px)!important;height:calc(100dvh - 58px)!important;max-height:none!important;min-height:300px!important}
+  #app.club3d .hero.on3d .wm{font-size:44px}
+  #app.club3d .liens{margin-top:0}
+}
 </style>
 </head>
 <body>
