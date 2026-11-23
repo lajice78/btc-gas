@@ -423,6 +423,25 @@ button.primary{font-size:20px!important;letter-spacing:.12em!important;box-shado
 .tirv .board .l{padding:2px 0!important;min-height:0!important;font-size:14px}
 .tirv .board .m{width:23px!important;height:23px!important;font-size:12px}
 @media (max-height:700px){.tirv .board .l:not(.cur){display:none}.tirv .now .ctx{display:none}}
+
+/* club-house : scores en direct des trois pas, puis statistiques du club */
+.chb{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.chseg{display:flex;gap:4px;background:var(--surface2);border:1px solid var(--line);border-radius:999px;padding:4px}.chseg button{border:0;background:none;border-radius:999px;min-height:38px;padding:6px 16px;width:auto;font-weight:700}.chseg button.primary{background:var(--accent);color:var(--on-accent)}
+.ch3{display:grid;gap:10px;grid-template-columns:1fr}@media(min-width:900px){.ch3{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}}
+.chp{gap:6px;padding:12px 14px;border-top:4px solid var(--line)}.chp.occ{border-top-color:var(--accent)}.chp.lib{border-top-color:var(--ok)}
+.chp h2{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0;font-size:20px}
+.chet{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:5px 10px;white-space:nowrap}.chet.lib{background:rgba(53,208,127,.16);color:var(--ok-ink)}.chet.occ{background:rgba(255,106,31,.18);color:var(--accent-ink)}
+.chvide{margin:0;color:var(--muted);font-size:14px}.chvide b{color:inherit;font-weight:700}
+.chd{grid-template-columns:minmax(0,1fr) repeat(5,24px) 56px;gap:3px 4px;font-size:14px}.chd .c{height:22px;line-height:22px;font-size:12px;border-radius:6px}.chd .t{font-size:18px}.chd .nm{white-space:nowrap;text-overflow:ellipsis}.chd .nm small{display:inline;font-size:11px}
+.chder,.chsuite{margin:0;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}.chder i{width:10px;height:10px;border-radius:50%;flex:none}
+@media(min-width:900px){#app.large .chd{font-size:17px;grid-template-columns:minmax(0,1fr) repeat(5,32px) 76px;gap:6px}#app.large .chd .c{height:30px;line-height:30px;font-size:15px}#app.large .chd .t{font-size:26px}#app.large .chp h2{font-size:24px}}
+.chk{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.chk .kpi{border-radius:14px;padding:10px 8px;border:1px solid var(--line);border-top:3px solid var(--kc,var(--accent));background:linear-gradient(170deg,color-mix(in srgb,var(--kc,var(--accent)) 16%,transparent),transparent 70%)}.chk .kpi b{font-size:clamp(20px,5.5vw,34px)}.chk .kpi span{font-size:11px;line-height:1.15}
+.chk .k1{--kc:#ff6a1f}.chk .k2{--kc:#3987e5}.chk .k3{--kc:#35d07f}.chk .k4{--kc:#9f7bf0}
+@media(max-width:520px){.chk{gap:6px}.chk .kpi{padding:8px 6px}.chk .kpi b{font-size:19px}.chk .kpi b small{font-size:11px}.chk .kpi span{font-size:9.5px;letter-spacing:0}}
+.ch2{display:grid;gap:10px;grid-template-columns:1fr}@media(min-width:800px){.ch2{grid-template-columns:1fr 1fr}}
+.chc{gap:0;padding:10px 14px}.chc h2{margin:0 0 2px;font-size:17px}.chc .rank,.chc .rank.first{padding:5px 0;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;background:none;border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;margin:0}.chc .rank:last-child{border-bottom:0}.chc .rank .rg{width:26px;height:26px;min-width:0;font-size:13px;line-height:26px;box-shadow:none}.chc .rank b{font-size:15px}.chc .rank .sc{font-size:20px}.chc .rank .sc small{font-size:11px}.chc .rank.first .rg{background:var(--accent);color:var(--on-accent)}
+.chr{gap:6px;flex-wrap:wrap}.chr button{flex:1 1 40%;min-height:40px;padding:6px 8px;font-size:14px}
+@media(max-width:480px){.liens{gap:4px!important;padding-left:6px!important;padding-right:6px!important;justify-content:space-between}.liens .link{padding:6px 7px!important;font-size:10.5px!important;letter-spacing:.02em!important;min-height:34px}.liens .vgrp{display:none}}
 </style>
 </head>
 <body>
@@ -720,7 +739,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function fbDirect() { if (!HORS || !DIRECT_ON) return; fbListe('direct', '', {}).then(function (d) { var av = Object.keys(st.direct || {}).join(); st.direct = d; setTimeout(direProch, 0); var parti = false, ailleurs = function (c) { return c && d[c.id] && d[c.id].tel && d[c.id].tel !== ME && !(c.pris > Date.now() - 20000); };
     Object.keys(st.pauses).forEach(function (id) { if (ailleurs(st.pauses[id])) { delete st.pauses[id]; parti = true; } }); if (ailleurs(st.cours)) { st.cours = null; parti = true; if (st.ecran === 'tir') st.ecran = 'accueil'; } if (parti) saveLocal();
     if (st.ecran === 'direct' || st.ecran === 'pas' || parti || (st.ecran === 'accueil' && av !== Object.keys(d).join())) render(); }).catch(function () {}); }
-  function dirGo() { if (!HORS || dirT) return; fbDirect(); dirT = setInterval(function () { if (st.ecran !== 'direct') { clearInterval(dirT); dirT = null; return; } if (!document.hidden) { if (++st.dtic % 2 === 0) st.dper = (st.dper + 1) % 4; fbDirect(); fbSync(false); } }, 6000); }
+  function dirGo() { if (!HORS || dirT) return; fbDirect(); dirT = setInterval(function () { if (st.ecran !== 'direct') { clearInterval(dirT); dirT = null; return; } if (!document.hidden) { if (!st.dfix && st.dtab !== 'stats' && ++st.dtic % 2 === 0) st.dper = (st.dper + 1) % 4; fbDirect(); fbSync(false); } }, 6000); }
   setInterval(function () { if (st.ecran === 'tir' && st.cours && !document.hidden) vivre(); if (st.ecran === 'pas' && !document.hidden) fbDirect(); }, 60000); // signe de vie du téléphone qui note
   function pousser(col, id, body) { if (HORS) { fbSet(col, col === 'sessions' ? 'ses' : 'lic', id); return; } if (!db) return; db.collection(col).doc(id).set(body).catch(function () {}); }
   function retirer(col, id) { if (HORS) { fetch(FB + col + '/' + encodeURIComponent(id), { method: 'DELETE', headers: fbTete() }).catch(function () {}); if (col === 'licencies') fetch(FB + 'fiches/' + encodeURIComponent(id), { method: 'DELETE', headers: fbTete() }).catch(function () {}); return; } if (!db) return; db.collection(col).doc(id).delete().catch(function () {}); }
@@ -909,6 +928,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       '<button data-act="nouv" data-d="DTL"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M60 14L22 2"/><path d="M60 14V0"/><path d="M60 14L98 2"/></g><rect x="52" y="12" width="16" height="7" rx="2" fill="#ff6a1f"/><g fill="currentColor"><circle cx="16" cy="40" r="5"/><circle cx="38" cy="47" r="5"/><circle cx="60" cy="50" r="5"/><circle cx="82" cy="47" r="5"/><circle cx="104" cy="40" r="5"/></g></svg><b>DTL</b><span>5 tireurs, 5 plateaux par poste<br>3 pts / 2 pts / 0</span></button>' +
       '<button data-act="nouv" data-d="FU"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M16 14L4 0"/><path d="M38 14L46 0"/><path d="M60 14V0"/><path d="M82 14L72 0"/><path d="M104 14L116 0"/></g><g fill="#ff6a1f"><rect x="10" y="12" width="12" height="7" rx="2"/><rect x="32" y="12" width="12" height="7" rx="2"/><rect x="54" y="12" width="12" height="7" rx="2"/><rect x="76" y="12" width="12" height="7" rx="2"/><rect x="98" y="12" width="12" height="7" rx="2"/></g><g fill="currentColor"><circle cx="16" cy="48" r="5"/><circle cx="38" cy="48" r="5"/><circle cx="60" cy="48" r="5"/><circle cx="82" cy="48" r="5"/><circle cx="104" cy="48" r="5"/></g></svg><b>FU</b><span>Fosse universelle, 6 tireurs<br>1 pt par plateau cassé</span></button></div></div>';
     h += '<div class="liens">' + voixSw(); if (HORS) h += '<button class="link adm" style="opacity:.85;font-size:13px" data-act="aller" data-e="membre">' + (st.membre ? 'Mon espace · ' + esc(st.membre.nom) : 'Espace membre') + '</button>';
+    h += '<button class="link adm" style="opacity:.85;font-size:13px" data-act="compte">Mon compte</button>';
     h += '<button class="link adm" style="opacity:.85;font-size:13px" data-act="secu" data-r="accueil">Sécurité</button>';
     h += '<button class="link adm" data-act="aller" data-e="club">Administrateur</button></div>';
     return h;
@@ -1071,44 +1091,45 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     return h + (corps || '<p class="muted">Aucune série enregistrée pour ce tireur.</p>');
   }
   function vDirect() {
-    var now = Date.now(), ordre = { A: 1, B: 2, C: 3 }, L = Object.keys(st.direct || {}).map(function (id) { return st.direct[id]; }).filter(function (s) { return s && s.maj > now - 45 * 60000 && s.tireurs && s.tireurs.length && s.tirs && s.tirs.length && s.tirs.length < s.tireurs.length * NB; });
-    L.sort(function (p, q) { return (ordre[p.pas] || 9) - (ordre[q.pas] || 9) || p.date - q.date; });
-    var h = entete('Club-house', 'accueil');
+    var now = Date.now(), h = entete('Club-house', 'accueil');
     if (!HORS) return h + '<p class="muted">Cet écran fonctionne sur la version ouverte par le QR code.</p>';
+    var tab = st.dtab === 'stats' ? 'stats' : 'live', bt = function (k, t) { return '<button' + (tab === k ? ' class="primary"' : '') + ' data-act="dtab" data-k="' + k + '">' + t + '</button>'; };
+    h += '<div class="chb"><div class="chseg">' + bt('live', 'En direct') + bt('stats', 'Stats du club') + '</div>' + (tab === 'live' ? voixSw() : '') + '</div>';
+    if (tab === 'live') {
+      h += ['A', 'B', 'C'].map(lancAlerte).join('') + '<div class="ch3">';
+      [['DTL', 'A'], ['FU', 'B'], ['DTL', 'C']].forEach(function (q) {
+        var W = enCoursAu(q[0], q[1]).filter(function (x) { return x.s.tireurs && x.s.tireurs.length && x.s.tirs.length < x.s.tireurs.length * NB; });
+        var lancee = function (x) { return x.s.tirs.length > 0 || !!x.s.go || /^console-/.test(x.s.tel || ''); }, cur = W.filter(lancee)[0], att = W.filter(function (x) { return x !== cur; });
+        h += '<div class="card chp ' + (cur ? 'occ' : 'lib') + '"><h2><span>' + nomPas(q[0], q[1]) + '</span>';
+        if (!cur) h += '<span class="chet lib">Libre</span></h2><p class="chvide">' + (att.length ? 'Prochaine planche : <b>' + esc(att[0].s.tireurs.map(function (t) { return nomCourt(t.nom); }).join(', ')) + '</b>' : 'Aucune planche en cours.') + '</p>';
+        else {
+          var c = cur.s, e = etat(c), b = bilan(c), mx = maxPts(c.disc), der = c.tirs.length ? c.tirs[c.tirs.length - 1] : null, qui = c.tirs.length ? c.tireurs[(c.tirs.length - 1) % e.N].nom : '';
+          h += '<span class="chet occ">' + (c.num ? numAff(c.num) + ' · ' : '') + (c.console ? 'en cours' : 'plateau ' + Math.min(NB, e.k + 1) + '/' + NB) + '</span></h2>';
+          if (c.console) h += '<p class="chvide">Planche en cours à la console du pas de tir.' + (c.tireurs[0].nom !== 'Planche à la console' ? '<br><b>' + esc(c.tireurs.map(function (t) { return nomCourt(t.nom); }).join(', ')) + '</b>' : '') + '</p>';
+          else {
+            h += '<div class="dir chd"><span></span><span class="lab">1</span><span class="lab">2</span><span class="lab">3</span><span class="lab">4</span><span class="lab">5</span><span class="lab">Total</span>';
+            b.forEach(function (x) { var on = x.i === e.i; h += '<span class="nm' + (on ? ' on' : '') + '">' + (on ? '▸ ' : '') + esc(nomCourt(x.nom)) + (on ? ' <small>poste ' + e.poste + '</small>' : '') + '</span>'; for (var g = 0; g < 5; g++) h += '<span class="c">' + (x.marks[g * 5] === null ? '' : x.series[g]) + '</span>'; h += '<span class="t">' + x.total + '<small>/' + mx + '</small></span>'; });
+            h += '</div>' + (der === null ? '' : '<p class="chder"><i class="s' + der + '"></i>' + esc(nomCourt(qui)) + ' : ' + (der === 1 ? 'cassé au 1er coup' : der === 2 ? 'cassé au 2e coup' : 'raté') + '</p>');
+          }
+          if (att.length) h += '<p class="chsuite">Ensuite : ' + esc(att[0].s.tireurs.map(function (t) { return nomCourt(t.nom); }).join(', ')) + (att.length > 1 ? ' · +' + (att.length - 1) + ' en attente' : '') + '</p>';
+        }
+        h += '</div>';
+      });
+      return h + '</div>';
+    }
     var J = new Date(); J.setHours(0, 0, 0, 0); var t0 = [J.getTime(), J.getTime() - ((J.getDay() + 6) % 7) * 86400000, new Date(J.getFullYear(), J.getMonth(), 1).getTime(), new Date(J.getFullYear(), 0, 1).getTime()], PN = ['Jour', 'Semaine', 'Mois', 'Année'], PT = ['du jour', 'de la semaine', 'du mois', "de l'année"];
-    var tous = Object.keys(st.ses).map(function (id) { return st.ses[id]; }), duJour = tous.filter(function (s) { return s.date >= t0[0]; }), nbS = duJour.reduce(function (p, s) { return p + s.tireurs.length; }, 0);
-    function rec(depuis) { var o = null; ['DTL', 'FU'].forEach(function (dc) { if (o) return; Object.keys(st.ses).forEach(function (id) { var s = st.ses[id]; if (s.disc !== dc || s.date < depuis) return; bilan(s).forEach(function (x) { if (!o || x.total > o.v) o = { v: x.total, nom: x.nom, d: dc, id: id }; }); }); }); return o; }
-    function kpi(v, lab) { return '<div class="kpi"><b>' + v + '</b><span>' + lab + '</span></div>'; }
-    function krec(o, lab) { return o ? '<div class="kpi clic" role="button" tabindex="0" data-act="voir" data-id="' + o.id + '"><b>' + o.v + '<small>/' + maxPts(o.d) + '</small></b><span>' + lab + ' ' + o.d + ' · ' + esc(nomCourt(o.nom)) + '</span></div>' : kpi('-', lab); }
-    h += '<div class="card"><div class="kpis">' + kpi(L.length, 'planche' + (L.length > 1 ? 's' : '') + ' en cours') + kpi((function () { var o = {}; duJour.concat(L).forEach(function (c) { (c.tireurs || []).forEach(function (t) { o[slug(t.nom)] = 1; }); }); return Object.keys(o).length; })(), 'tireurs présents') + kpi(nbS, 'séries aujourd\'hui') + kpi(nbS * NB, 'plateaux du jour') + krec(rec(t0[0]), 'meilleure du jour') + krec(rec(t0[2]), 'record du mois') + krec(rec(t0[3]), 'record de l\'année') + '</div></div>';
-    h += voixSw() + ['A', 'B', 'C'].map(lancAlerte).join('') + '<div class="sup"><div class="stack">';
-    var proch = [['DTL', 'A'], ['FU', 'B'], ['DTL', 'C']].map(function (q) { var w = enCoursAu(q[0], q[1]).filter(function (x) { return !etat(x.s).n; }); return w.length ? { q: q, s: w[0].s, n: w.length } : null; }).filter(function (x) { return x; });
-    if (proch.length) h += '<div class="card"><h2>Prochaines planches appelées</h2>' + proch.map(function (x) { return '<div class="item"><span><b>' + nomPas(x.q[0], x.q[1]) + '</b>' + (x.s.num ? ' · ' + numAff(x.s.num) : '') + '<br><span class="small muted">' + esc(x.s.tireurs.map(function (t) { return nomCourt(t.nom); }).join(', ')) + '</span></span><span class="small muted">' + (x.n > 1 ? '+' + (x.n - 1) + ' en attente' : 'préparez-vous') + '</span></div>'; }).join('') + '</div>';
-    if (!L.length) h += '<div class="card"><h2>Aucune planche en cours</h2><p class="muted">Les planches apparaissent ici dès qu\'elles démarrent, et se mettent à jour à chaque tir.</p></div>';
-    h += '<div class="mur">';
-    L.forEach(function (s) {
-      var e = etat(s), b = bilan(s), mx = maxPts(s.disc), der = s.tirs.length ? s.tirs[s.tirs.length - 1] : null, qui = s.tirs.length ? s.tireurs[(s.tirs.length - 1) % e.N].nom : '';
-      h += '<div class="card"><h2>' + nomPas(s.disc, s.pas) + (s.num ? ' · ' + numAff(s.num) : '') + '<span class="small muted" style="float:right;font-weight:500">plateau ' + Math.min(NB, e.k + 1) + '/' + NB + '</span></h2>';
-      h += '<div class="dir"><span></span><span class="lab">1</span><span class="lab">2</span><span class="lab">3</span><span class="lab">4</span><span class="lab">5</span><span class="lab">Total</span>';
-      b.forEach(function (x) { var on = x.i === e.i; h += '<span class="nm' + (on ? ' on' : '') + '">' + esc(x.nom) + (on ? '<small>poste ' + e.poste + '</small>' : '') + '</span>'; for (var g = 0; g < 5; g++) h += '<span class="c">' + (x.marks[g * 5] === null ? '' : x.series[g]) + '</span>'; h += '<span class="t">' + x.total + '<small>/' + mx + '</small></span>'; });
-      h += '</div>' + (der === null ? '' : '<p class="small muted">Dernier tir : ' + esc(qui) + ', ' + (der === 1 ? 'cassé au 1er coup' : der === 2 ? 'cassé au 2e coup' : 'raté') + '.</p>') + '</div>';
-    });
-    h += '</div></div><div class="stack"><div class="chips">' + PN.map(function (n, k) { return '<button' + (st.dper === k ? ' class="primary"' : '') + ' data-act="dper" data-k="' + k + '">' + n + '</button>'; }).join('') + '</div>';
-    var vide = true; ['DTL', 'FU'].forEach(function (dc) {
-      var a = general(dc, 'moy', 'tous', false, t0[st.dper]); if (!a.length) return; vide = false;
-      h += '<div class="card"><h2>Classement ' + PT[st.dper] + ' · ' + dc + '</h2>' + a.slice(0, 6).map(function (o) { return '<div class="rank clic' + (o.rang === 1 ? ' first' : '') + '" role="button" tabindex="0" data-act="voir" data-id="' + o.bid + '"><span class="rg">' + o.rang + '</span><span><b>' + esc(o.nom) + '</b><br><span class="small muted">' + o.n + ' série' + (o.n > 1 ? 's' : '') + ' · meilleure ' + o.best + '</span></span><span class="sc">' + (Math.round(o.moy * 10) / 10).toString().replace('.', ',') + '<small>/' + maxPts(dc) + '</small></span></div>'; }).join('') + '</div>'; });
-    if (vide) h += '<div class="card"><h2>Classement ' + PT[st.dper] + '</h2><p class="muted">Aucune série enregistrée sur cette période.</p></div>';
+    var S = Object.keys(st.ses).map(function (id) { return st.ses[id]; }).filter(function (x) { return x.date >= t0[st.dper]; }), tir = {}, nSer = 0, nT = 0, nC = 0, n1 = 0;
+    S.forEach(function (x) { nSer += x.tireurs.length; x.tireurs.forEach(function (t) { tir[slug(t.nom)] = 1; }); x.tirs.forEach(function (r) { nT++; if (r) nC++; if (r === 1) n1++; }); });
+    function rec(depuis) { var o = null; ['DTL', 'FU'].forEach(function (dc) { if (o) return; Object.keys(st.ses).forEach(function (id) { var x = st.ses[id]; if (x.disc !== dc || x.date < depuis) return; bilan(x).forEach(function (y) { if (!o || y.total > o.v) o = { v: y.total, nom: y.nom, d: dc, id: id }; }); }); }); return o; }
+    function kpi(v, lab, cl) { return '<div class="kpi' + (cl ? ' ' + cl : '') + '"><b>' + v + '</b><span>' + lab + '</span></div>'; }
+    function krec(o, lab) { return o ? '<div class="kpi clic k4" role="button" tabindex="0" data-act="voir" data-id="' + o.id + '"><b>' + o.v + '<small>/' + maxPts(o.d) + '</small></b><span>' + lab + ' · ' + esc(nomCourt(o.nom)) + '</span></div>' : kpi('-', lab, 'k4'); }
+    var pc = function (a, b2) { return b2 ? Math.round(a / b2 * 100) + ' %' : '-'; };
+    h += '<div class="chb"><div class="chseg">' + PN.map(function (n, k) { return '<button' + (st.dper === k ? ' class="primary"' : '') + ' data-act="dper" data-k="' + k + '">' + n + '</button>'; }).join('') + '</div></div>';
+    h += '<div class="kpis chk">' + kpi(S.length, 'planche' + (S.length > 1 ? 's' : ''), 'k1') + kpi(Object.keys(tir).length, 'tireurs', 'k2') + kpi(nSer, 'séries', 'k1') + kpi(nT, 'plateaux tirés', 'k2') + kpi(pc(nC, nT), 'plateaux cassés', 'k3') + kpi(pc(n1, nT), 'cassés au 1er coup', 'k3') + krec(rec(t0[st.dper]), 'meilleure série ' + PT[st.dper]) + krec(rec(t0[3]), "record de l'année") + '</div><div class="ch2">';
     ['DTL', 'FU'].forEach(function (dc) {
-      var best = null, suite = null, mx = maxPts(dc);
-      Object.keys(st.ses).forEach(function (id) { var s = st.ses[id]; if (s.disc !== dc || s.date < t0[3]) return; bilan(s).forEach(function (x) { if (!best || x.total > best.v) best = { v: x.total, nom: x.nom, id: id, d: s.date }; var run = 0; x.marks.forEach(function (r) { if (r) { run++; if (!suite || run > suite.v) suite = { v: run, nom: x.nom, id: id, d: s.date }; } else run = 0; }); }); });
-      if (!best) return; var gm = general(dc, 'moy', 'tous', true, t0[3]).filter(function (o) { return o.ok; })[0], ga = general(dc, 'assid', 'tous', false, t0[3])[0];
-      var lg = function (lab, nom, val, id) { return '<div class="item' + (id ? ' clic" role="button" tabindex="0" data-act="voir" data-id="' + id : '') + '"><span>' + lab + '<br><span class="small muted">' + esc(nom) + '</span></span><b>' + val + '</b></div>'; };
-      h += '<div class="card"><h2>Records de l\'année · ' + dc + '</h2>' + lg('Meilleure série', best.nom + ' · ' + fdate(best.d).slice(0, 10), best.v + '<small>/' + mx + '</small>', best.id) + (suite ? lg('Plateaux cassés d\'affilée', suite.nom + ' · ' + fdate(suite.d).slice(0, 10), suite.v, suite.id) : '') + (gm ? lg('Meilleure moyenne (3 séries minimum)', gm.nom, (Math.round(gm.moy * 10) / 10).toString().replace('.', ',') + '<small>/' + mx + '</small>', gm.bid) : '') + (ga ? lg('Le plus assidu', ga.nom, ga.n + ' série' + (ga.n > 1 ? 's' : ''), ga.bid) : '') + '</div>'; });
-    var der = tous.filter(function (s) { return s.date >= t0[st.dper]; }).sort(function (p, q) { return q.date - p.date; }).slice(0, 5);
-    if (der.length) h += '<div class="card"><h2>Dernières feuilles ' + PT[st.dper] + '</h2>' + der.map(function (s) { var c = classement(s)[0]; return '<div class="item clic" role="button" tabindex="0" data-act="voir" data-id="' + s.id + '"><span><b>' + s.disc + '</b> · ' + fdate(s.date) + (s.num ? ' · ' + numAff(s.num) : '') + '<br><span class="small muted">' + s.tireurs.length + ' tireur(s) · 1er : ' + esc(c.nom) + ' ' + c.total + '/' + maxPts(s.disc) + '</span></span><span class="muted">›</span></div>'; }).join('') + '</div>';
-    h += '<div class="row"><button style="flex:1" data-act="aller" data-e="concours">Concours</button><button style="flex:1" data-act="secu" data-r="direct">Règles de sécurité</button></div>';
-    h += '<div class="row"><button style="flex:1" data-act="aller" data-e="general">Tous les classements</button><button style="flex:1" data-act="aller" data-e="historique">Toutes les feuilles</button></div>';
-    h += '<p class="small muted">Moyenne par série de 25 plateaux. Touchez un résultat pour ouvrir la feuille (pour un tireur : sa meilleure série de la période). La période change toute seule toutes les 12 secondes.</p></div></div>';
+      var a = general(dc, 'moy', 'tous', false, t0[st.dper]);
+      h += '<div class="card chc"><h2>Classement ' + dc + ' <span class="small muted">' + PT[st.dper] + '</span></h2>' + (a.length ? a.slice(0, innerHeight < 820 && innerWidth < 800 ? 3 : 5).map(function (o) { return '<div class="rank clic' + (o.rang === 1 ? ' first' : '') + '" role="button" tabindex="0" data-act="voir" data-id="' + o.bid + '"><span class="rg">' + o.rang + '</span><span><b>' + esc(nomCourt(o.nom)) + '</b> <span class="small muted">' + o.n + ' série' + (o.n > 1 ? 's' : '') + ' · meilleure ' + o.best + '</span></span><span class="sc">' + (Math.round(o.moy * 10) / 10).toString().replace('.', ',') + '<small>/' + maxPts(dc) + '</small></span></div>'; }).join('') : '<p class="muted">Aucune série sur cette période.</p>') + '</div>'; });
+    h += '</div><div class="row chr"><button data-act="aller" data-e="general">Tous les classements</button><button data-act="aller" data-e="historique">Toutes les feuilles</button><button data-act="aller" data-e="concours">Concours</button><button data-act="secu" data-r="direct">Sécurité</button></div>';
     return h;
   }
   function vHisto() {
@@ -1834,7 +1855,9 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'gcat') st.gcat = b.dataset.c;
     else if (a === 'imprimer') { try { window.print(); } catch (e) {} return; }
     else if (a === 'tireur') { st.tireur = b.dataset.k; st.retourT = st.ecran; st.ecran = 'tireur'; window.scrollTo(0, 0); }
-    else if (a === 'dper') { st.dper = +b.dataset.k; st.dtic = 0; }
+    else if (a === 'dper') { st.dper = +b.dataset.k; st.dtic = 0; st.dfix = true; }
+    else if (a === 'dtab') { st.dtab = b.dataset.k; }
+    else if (a === 'compte') { location.href = (location.protocol === 'http:' && !/github\.io$/.test(location.hostname) ? '' : 'http://192.168.1.55:8080') + '/compte'; return; } // solde, plateaux et paiement : sur la console du club (Wi-Fi du club)
     else if (a === 'xtout') { telecharger('btc-gas-feuilles-' + horodate() + '.csv', csvTout()); return; }
     else if (a === 'xgen') { telecharger('btc-gas-classement-' + horodate() + '.csv', csvGeneral()); return; }
     else if (a === 'xjson') { telecharger('btc-gas-sauvegarde-' + horodate() + '.json', jsonTout()); return; }
