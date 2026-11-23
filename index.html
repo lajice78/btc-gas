@@ -513,6 +513,7 @@ button.primary{font-size:20px!important;letter-spacing:.12em!important;box-shado
 .cptr button{min-height:0;width:auto;backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none}
 .cptr h1{text-align:left}.cptr .simu{border-radius:12px;border:1px solid #6b4d08}
 #app:has(>.cptr){padding-bottom:0}
+.cptr .cptl{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:none}.cptr .cptl button{padding:10px 8px}.cptr .cpth{margin:0;color:var(--or);font-weight:600;text-align:center}
 </style>
 </head>
 <body>
@@ -616,6 +617,15 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   /* ---- espace membre : code du club + son nom ---- */
   var MEMBRE_MAIL = 'membre@btc-gas.firebaseapp.com', jetonM = null, MEMBRES = lget('btc.mOn', false); // MEMBRES : l'administrateur a défini un code du club
   st.membre = lget('btc.membre', null);
+  // une seule connexion pour toute l'appli : le compte (nom + code personnel, vérifiés par la console du club) ouvre aussi l'espace membre
+  window.BTCMembre = function (c, tk) {
+    if (!c) { st.membre = null; jetonM = null; lset('btc.membre', null); if (st.ecran === 'compte') setTimeout(render, 0); return; }
+    var k = slug(c.nom), anc = st.membre && st.membre.k === k ? st.membre : null;
+    st.membre = { nom: st.lic[k] ? st.lic[k].nom : c.nom, k: k, rt: (tk && tk.refreshToken) || (anc && anc.rt) || '', fusil: lget('btc.fusils', {})[k], uid: c.uid };
+    if (tk && tk.idToken) jetonM = tk.idToken; lset('btc.membre', st.membre);
+    var ap = st.apres; st.apres = null; if (ap) setTimeout(function () { ouvrirPas(ap.disc, ap.pas); }, 0); else if (st.ecran === 'compte' && !document.querySelector('.cptl')) setTimeout(render, 0);
+  };
+  window.BTCMembreManque = function () { return !(st.membre && st.membre.rt); };
   function fbMaj(idToken, code) { return fetch('https://identitytoolkit.googleapis.com/v1/accounts:update?key=' + FKEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: idToken, password: 'btc-gas-' + code, returnSecureToken: true }) }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }); }
   function rafraichir() {
     if (!HORS || !st.membre || !st.membre.rt) return;
@@ -743,8 +753,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function vMembre() {
     var h = entete('Espace membre', 'accueil');
     if (st.membre) return h + '<div class="card"><h2>' + esc(st.membre.nom) + '</h2><p class="muted">Vous êtes connecté sur ce téléphone.</p><button class="primary" data-act="tireur" data-k="' + st.membre.k + '">Mes statistiques</button>' + (window.THREE ? '<button data-act="aller" data-e="avatar">Mon avatar</button>' : '') + '<button data-act="aller" data-e="fusil">Mon fusil</button>' + '<button class="ghost" data-act="membreout">Me déconnecter</button></div>';
-    var noms = licNoms();
-    return h + '<div class="card"><h2>Connexion</h2><p class="muted">' + (st.apres ? 'Il faut être connecté pour noter une planche. ' : '') + 'Saisissez le code du club, puis choisissez votre nom.</p><input type="password" id="mcode" autocomplete="off" placeholder="Code du club"><input type="text" id="mnom" list="dl-mb" autocomplete="off" placeholder="Votre nom"><datalist id="dl-mb">' + noms.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist><button class="primary" data-act="membrein">Me connecter</button>' + (st.msg ? '<p class="err">' + esc(st.msg) + '</p>' : '') + '</div>';
+    return h + '<div class="card"><h2>Connexion</h2><p class="muted">' + (st.apres ? 'Il faut être connecté pour noter une planche. ' : '') + 'Un seul nom et un seul code pour toute l\'appli : votre nom et votre code personnel à 4 chiffres, les mêmes qu\'au pas de tir.</p><button class="primary" data-act="compte">Me connecter</button></div>';
   }
   function fbFiches() { if (!jeton) return; fetch(FB + 'fiches?pageSize=300', { headers: fbTete() }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (j) { (j.documents || []).forEach(function (d) { var id = d.name.split('/').pop(), v = fbDec({ mapValue: { fields: d.fields || {} } }); st.lic[id] = Object.assign(st.lic[id] || {}, v, { _s: 1 }); }); saveLocal(); if (st.ecran === 'club' && st.fiche === null) render(); }).catch(function () {}); }
   function fbCorps(col, x) { return col === 'licencies' ? (x.categorie || x.cat ? { nom: x.nom, cat: String(x.categorie || x.cat).trim().slice(0, 40) } : { nom: x.nom }) : corpsSes(x); }
@@ -999,8 +1008,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     h += '<div class="stack"><div class="disc">' +
       '<button data-act="nouv" data-d="DTL"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M60 14L22 2"/><path d="M60 14V0"/><path d="M60 14L98 2"/></g><rect x="52" y="12" width="16" height="7" rx="2" fill="#ff6a1f"/><g fill="currentColor"><circle cx="16" cy="40" r="5"/><circle cx="38" cy="47" r="5"/><circle cx="60" cy="50" r="5"/><circle cx="82" cy="47" r="5"/><circle cx="104" cy="40" r="5"/></g></svg><b>DTL</b><span>5 tireurs, 5 plateaux par poste<br>3 pts / 2 pts / 0</span></button>' +
       '<button data-act="nouv" data-d="FU"><svg viewBox="0 0 120 56" aria-hidden="true"><g stroke="#ff8a4a" stroke-width="1.5" stroke-dasharray="2 4" fill="none"><path d="M16 14L4 0"/><path d="M38 14L46 0"/><path d="M60 14V0"/><path d="M82 14L72 0"/><path d="M104 14L116 0"/></g><g fill="#ff6a1f"><rect x="10" y="12" width="12" height="7" rx="2"/><rect x="32" y="12" width="12" height="7" rx="2"/><rect x="54" y="12" width="12" height="7" rx="2"/><rect x="76" y="12" width="12" height="7" rx="2"/><rect x="98" y="12" width="12" height="7" rx="2"/></g><g fill="currentColor"><circle cx="16" cy="48" r="5"/><circle cx="38" cy="48" r="5"/><circle cx="60" cy="48" r="5"/><circle cx="82" cy="48" r="5"/><circle cx="104" cy="48" r="5"/></g></svg><b>FU</b><span>Fosse universelle, 6 tireurs<br>1 pt par plateau cassé</span></button></div></div>';
-    h += '<div class="liens">' + voixSw(); if (HORS) h += '<button class="link adm" style="opacity:.85;font-size:13px" data-act="aller" data-e="membre">' + (st.membre ? 'Mon espace · ' + esc(st.membre.nom) : 'Espace membre') + '</button>';
-    h += '<button class="link adm" style="opacity:.85;font-size:13px" data-act="compte">Mon compte</button>';
+    h += '<div class="liens">' + voixSw(); h += '<button class="link adm" style="opacity:.85;font-size:13px" data-act="compte">' + (st.membre ? 'Mon compte · ' + esc(nomCourt(st.membre.nom)) : 'Me connecter') + '</button>';
     h += '<button class="link adm" style="opacity:.85;font-size:13px" data-act="secu" data-r="accueil">Sécurité</button>';
     h += '<button class="link adm" data-act="aller" data-e="club">Administrateur</button></div>';
     return h;
@@ -1122,7 +1130,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     return h;
   }
   function ouvrirPas(disc, pas) {
-    if (HORS && MEMBRES && !st.membre && !st.clubOk) { st.apres = { disc: disc, pas: pas || '' }; st.msg = ''; st.ecran = 'membre'; render(); window.scrollTo(0, 0); return; }
+    if (HORS && MEMBRES && !st.membre && !st.clubOk) { st.apres = { disc: disc, pas: pas || '' }; st.msg = ''; st.ecran = 'compte'; render(); window.scrollTo(0, 0); return; }
     var suite = function () { if (enCoursAu(disc, pas).length) { st.pasVu = { disc: disc, pas: pas || '' }; st.ecran = 'pas'; } else nouvellePlanche(disc, null, pas); render(); window.scrollTo(0, 0); };
     if (!HORS || !DIRECT_ON || navigator.onLine === false) return suite();
     var fait = false, une = function () { if (!fait) { fait = true; suite(); } }; setTimeout(une, 2500);
@@ -1162,7 +1170,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     h = entete(esc(nom || 'Tireur'), st.retourT || 'general'); if (corps) corps += '<div class="card"><h2>Cartouches tirées</h2>' + cartHtml(k, st.membre && st.membre.k === k && st.membre.fusil ? st.membre.fusil.man : 0) + '</div>';
     return h + (corps || '<p class="muted">Aucune série enregistrée pour ce tireur.</p>');
   }
-  function vCompte() { return entete('Mon compte', 'accueil') + '<div class="cptr"><div class="simu" id="cpt-simu" hidden>Compte d\'essai · recharge par carte simulée · aucun paiement réel</div><section class="carte" id="cpt-vue"></section></div>'; }
+  function vCompte() { return entete('Mon compte', 'accueil') + '<div class="cptr">' + (st.apres && !st.membre ? '<p class="cpth">Connectez-vous pour noter une planche.</p>' : '') + (st.membre ? '<div class="cptl"><button data-act="tireur" data-k="' + st.membre.k + '">Mes statistiques</button><button data-act="aller" data-e="historique">Mes feuilles</button></div>' : '') + '<div class="simu" id="cpt-simu" hidden>Compte d\'essai · recharge par carte simulée · aucun paiement réel</div><section class="carte" id="cpt-vue"></section></div>'; }
   function vDirect() {
     var now = Date.now(), h = entete('Club-house', 'accueil');
     if (!HORS) return h + '<p class="muted">Cet écran fonctionne sur la version ouverte par le QR code.</p>';
@@ -1854,7 +1862,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     }
     else if (a === 'cclos') { var cc = st.conc[st.cid]; b.disabled = true; concEnvoi(st.cid, concDoc(cc, { clos: !cc.clos })); return; }
     else if (a === 'cbar') { var cb = st.conc[st.cid], br = Object.assign({}, cb.barrage || {}); concClassement(st.cid).a.forEach(function (o) { var el = document.getElementById('bar_' + o.k); if (el && el.value !== '') br[o.k] = parseInt(el.value, 10) || 0; }); b.disabled = true; concEnvoi(st.cid, concDoc(cb, { barrage: br })); return; }
-    else if (a === 'cnoter') { var cn2 = st.conc[st.cid], gi = +b.dataset.g; if (HORS && MEMBRES && !st.membre && !st.clubOk) { st.msg = ''; st.ecran = 'membre'; } else { nouvellePlanche(cn2.disc, cn2.planches[gi - 1], b.dataset.p); st.planche.conc = { id: st.cid, m: +b.dataset.m, g: gi }; } }
+    else if (a === 'cnoter') { var cn2 = st.conc[st.cid], gi = +b.dataset.g; if (HORS && MEMBRES && !st.membre && !st.clubOk) { st.msg = ''; st.ecran = 'compte'; } else { nouvellePlanche(cn2.disc, cn2.planches[gi - 1], b.dataset.p); st.planche.conc = { id: st.cid, m: +b.dataset.m, g: gi }; } }
     else if (a === 'membreout') { st.membre = null; jetonM = null; lset('btc.membre', null); }
     else if (a === 'membrein') {
       var mc = (document.getElementById('mcode') || {}).value || '', mn = ((document.getElementById('mnom') || {}).value || '').trim().replace(/\s+/g, ' '), mk = slug(mn);
@@ -1965,6 +1973,7 @@ const S = {ticket: new URLSearchParams(location.search).get("t") || "", tk: null
 async function api(chemin, corps){ const r = await fetch(BASE + "/api/compte" + chemin, {method: corps ? "POST" : "GET", headers: {"Content-Type": "application/json", "X-Compte": S.jeton}, body: corps ? JSON.stringify(corps) : undefined}), j = await r.json().catch(() => ({}));
   if (r.status === 401){ S.jeton = ""; S.vue = "nom"; S.c = null; mem.ecrire("jeton", null); } if (!r.ok) throw new Error(j.erreur || "Refusé"); return j; }
 const mem = { lire(k){ try { return JSON.parse(localStorage.getItem("btcgas-compte-" + k) || "null"); } catch (e) { return null; } }, ecrire(k, v){ try { v == null ? localStorage.removeItem("btcgas-compte-" + k) : localStorage.setItem("btcgas-compte-" + k, JSON.stringify(v)); } catch (e) {} } };
+const ser = (n, par) => { par = par || 25; const q = Math.floor(n / par), r = n % par; return q + (q > 1 ? " séries" : " série") + (r ? " + " + r + " plateaux" : ""); }, pl = n => n > 1 ? "s" : "";
 const dire = (m, ko) => { S.msg = m || ""; S.ko = !!ko; };
 function dessiner(){
   if (!$("cpt-vue")) return;
@@ -1977,9 +1986,9 @@ function dessiner(){
   if (S.vue === "recu"){ const t = S.recu, q = new Date(t.quand); V.innerHTML = `<div class="ligne"><h1>Ticket</h1><small>${q.toLocaleDateString("fr-FR")} · ${q.toLocaleTimeString("fr-FR", {hour: "2-digit", minute: "2-digit"})}</small></div><div class="recap recu"><div><span>Ball Trap Club de Gas</span><b>${esc(c.nom)}</b></div>${t.lignes.slice(0, 7).map(l => `<div><span>${esc(l.nom)}${l.qte > 1 ? " × " + l.qte : ""}</span><b>${eur(l.prix)}</b></div>`).join("")}${t.lignes.length > 7 ? `<div><span>… et ${t.lignes.length - 7} autre(s)</span></div>` : ""}<div class="tot"><span>Total payé</span><b>${eur(t.total)}</b></div><div><span>Réglé avec</span><b>${esc(t.moyen)}</b></div></div>${t.frais ? `<div class="recap"><div><span>Nouveau solde</span><b>${eur(c.solde)}</b></div></div><p class="info">Paiement validé. Merci !</p>` : ""}<div class="bas"><button class="or" data-vue="compte">Retour à mon compte</button></div>`; return; }
   if (S.vue === "compte"){ const MOYC = {compte: "mon compte", especes: "espèces", carte: "carte", cheque: "chèque", virement: "virement"}, E = []; c.ecritures.forEach(e => { const d = E[E.length - 1]; if (e.type === "vente" && e.montant > 0 && d && d.tk && d.quand === e.quand && d.moyen === e.moyen){ d.lignes.push(e); d.montant += e.montant; } else E.push(e.type === "vente" && e.montant > 0 ? {tk: 1, quand: e.quand, moyen: e.moyen, type: "vente", montant: e.montant, lignes: [e]} : e); }); S.E = E;
     const par = innerHeight < 700 ? 2 : innerHeight < 820 ? 3 : 5, pages = Math.max(1, Math.ceil(E.length / par)); S.pg = Math.min(S.pg, pages - 1); const s = c.series[0], nbMax = s ? Math.max(1, Math.min(20, Math.floor(c.solde / s.prix))) : 1; S.nb = Math.max(1, Math.min(S.nb || 1, nbMax));
-    V.innerHTML = `<div class="ligne"><h1>${esc(c.nom)}</h1><button data-fermer="1">Quitter</button></div><div class="deux"><div class="s"><small>Mon solde</small><b>${eur(c.solde)}</b></div><div><small>Mes plateaux</small><b>${c.plateaux}</b></div></div>
-      ${s && !S.arme ? `<div class="nb"><button data-nb="-1"${S.nb > 1 ? "" : " disabled"}>−</button><span><b>${S.nb * s.plateaux} plateaux</b><small>${S.nb} série${S.nb > 1 ? "s" : ""} de ${s.plateaux}</small></span><button data-nb="1"${S.nb < nbMax && c.solde >= s.prix ? "" : " disabled"}>+</button></div>` : ""}<div class="bas" style="margin:0;flex-wrap:wrap">${s ? `<button class="or" style="flex:1 0 100%" data-serie="${esc(s.id)}"${c.solde >= s.prix ? "" : " disabled"}>${S.arme ? `Confirmer : ${S.nb * s.plateaux} plateaux pour ${eur(s.prix * S.nb)} ?` : `Prendre ${S.nb * s.plateaux} plateaux · ${eur(s.prix * S.nb)}`}</button>${S.arme ? '<button style="flex:1 0 100%" data-desarme="1">Non, annuler</button>' : ""}` : ""}${S.arme ? "" : '<button style="flex:1 0 100%" data-vue="recharge">Recharger mon compte</button>'}</div>${info}
-      <div class="ligne"><small>Mes mouvements · ${c.tires} plateaux tirés</small><span><button data-pg="-1"${S.pg ? "" : " disabled"}>‹</button> <button data-pg="1"${S.pg < pages - 1 ? "" : " disabled"}>›</button></span></div>
+    V.innerHTML = `<div class="ligne"><h1>${esc(c.nom)}</h1><button data-fermer="1">Quitter</button></div><div class="deux"><div class="s"><small>Mon solde</small><b>${eur(c.solde)}</b></div><div><small>Mes séries</small><b style="font-size:clamp(20px,3.8dvh,30px)">${ser(c.plateaux, s ? s.plateaux : 25)}</b></div></div>
+      ${s && !S.arme ? `<div class="nb"><button data-nb="-1"${S.nb > 1 ? "" : " disabled"}>−</button><span><b>${S.nb} série${pl(S.nb)}</b><small>${eur(s.prix)} la série de ${s.plateaux} plateaux</small></span><button data-nb="1"${S.nb < nbMax && c.solde >= s.prix ? "" : " disabled"}>+</button></div>` : ""}<div class="bas" style="margin:0;flex-wrap:wrap">${s ? `<button class="or" style="flex:1 0 100%" data-serie="${esc(s.id)}"${c.solde >= s.prix ? "" : " disabled"}>${S.arme ? `Confirmer : ${S.nb} série${pl(S.nb)} pour ${eur(s.prix * S.nb)} ?` : `Prendre ${S.nb} série${pl(S.nb)} · ${eur(s.prix * S.nb)}`}</button>${S.arme ? '<button style="flex:1 0 100%" data-desarme="1">Non, annuler</button>' : ""}` : ""}${S.arme ? "" : '<button style="flex:1 0 100%" data-vue="recharge">Recharger mon compte</button>'}</div>${info}
+      <div class="ligne"><small>Mes mouvements · ${ser(c.tires, s ? s.plateaux : 25)} tirée${pl(Math.floor(c.tires / (s ? s.plateaux : 25)))}</small><span><button data-pg="-1"${S.pg ? "" : " disabled"}>‹</button> <button data-pg="1"${S.pg < pages - 1 ? "" : " disabled"}>›</button></span></div>
       <ul class="hist">${E.slice(S.pg * par, S.pg * par + par).map((e, i) => e.tk ? `<li data-recu="${S.pg * par + i}" style="cursor:pointer"><i>${e.quand.slice(8, 10)}/${e.quand.slice(5, 7)}</i><span>${e.lignes.length > 1 ? "Ticket · " + e.lignes.length + " articles" : esc(e.lignes[0].libelle) + (e.lignes[0].qte > 1 ? " × " + e.lignes[0].qte : "")} ›</span><b>− ${eur(e.montant)}</b></li>` : `<li><i>${e.quand.slice(8, 10)}/${e.quand.slice(5, 7)}</i><span>${esc(e.libelle)}${e.qte > 1 ? " × " + e.qte : ""}</span><b class="${e.type === "recharge" ? "up" : ""}">${e.type === "recharge" ? "+ " : "− "}${eur(Math.abs(e.montant))}</b></li>`).join("") || "<li><span>Aucun mouvement pour l'instant.</span></li>"}</ul>`; return; }
   if (S.vue === "recharge"){ V.innerHTML = `<h1>Recharger</h1><div class="recap"><div><span>Mon solde</span><b>${eur(c.solde)}</b></div></div>` + (c.essai
       ? `<p>Par carte (simulation sur ce compte d'essai) :</p><div class="mont">${[10, 20, 30, 50, 75, 100].map(m => `<button data-m="${m}" class="${S.montant === m ? "on" : ""}">${m} €</button>`).join("")}</div><div class="cb"><em>Carte de démonstration</em><b>0000 0000 0000 0000</b><span>Dans la vraie version, la carte se saisit sur la page sécurisée du prestataire de paiement du club.</span></div>${info}<div class="bas"><button class="ret" data-vue="compte">‹</button><button class="or" id="cpt-payer">Payer ${S.montant} € (simulation)</button></div>`
@@ -1992,7 +2001,7 @@ document.addEventListener("input", ev => { if (ev.target.id !== "cpt-q") return;
 async function valider(){ const q = S.qui, code = S.code; S.code = "";
   if (q.premier && !S.code1){ S.code1 = code; dire(""); return; }
   if (q.premier && S.code1 !== code){ S.code1 = ""; dire("Les deux codes sont différents : recommencez.", 1); return; }
-  try { const j = await api("/ouvrir", {uid: q.uid, code, nouveau: !!q.premier}); S.jeton = j.jeton; S.c = j.compte; S.vue = "compte"; S.code1 = ""; S.pg = 0; mem.ecrire("jeton", S.jeton); mem.ecrire("qui", {uid: q.uid, nom: q.nom}); dire(q.premier ? "Code enregistré." : ""); await ticket(); } catch (e) { S.code1 = ""; dire(e.message, 1); } }
+  try { const j = await api("/ouvrir", {uid: q.uid, code, nouveau: !!q.premier}); S.jeton = j.jeton; S.c = j.compte; S.vue = "compte"; S.code1 = ""; S.pg = 0; mem.ecrire("jeton", S.jeton); mem.ecrire("qui", {uid: q.uid, nom: q.nom}); if (window.BTCMembre) window.BTCMembre(j.compte, j.membre); dire(q.premier ? "Code enregistré." : ""); await ticket(); } catch (e) { S.code1 = ""; dire(e.message, 1); } }
 document.addEventListener("click", async ev => { if (!ev.target.closest || !ev.target.closest("#cpt-vue")) return; const li = ev.target.closest("li[data-recu]"); if (li){ const e = S.E[+li.dataset.recu], M2 = {compte: "mon compte", especes: "espèces", carte: "carte", cheque: "chèque", virement: "virement"}; S.recu = {quand: e.quand, lignes: e.lignes.map(l => ({nom: l.libelle, qte: l.qte, prix: l.montant})), total: e.montant, moyen: M2[e.moyen] || e.moyen}; S.vue = "recu"; return dessiner(); }
   const b = ev.target.closest("button"); if (!b) return; const d = b.dataset;
   if (d.uid){ S.qui = S.trouves.find(x => x.uid === d.uid); S.vue = "code"; S.code = S.code1 = ""; dire(""); }
@@ -2008,11 +2017,11 @@ document.addEventListener("click", async ev => { if (!ev.target.closest || !ev.t
   else if (b.id === "cpt-payertk" && !S.arme){ S.arme = true; }
   else if (b.id === "cpt-payertk"){ S.arme = false; try { S.c = (await api("/payer", {ticket: S.ticket})).compte; S.recu = {quand: new Date().toISOString(), lignes: S.tk.lignes, total: S.tk.total, moyen: "mon compte", frais: 1}; S.vue = "recu"; S.pg = 0; dire(""); } catch (e) { S.vue = "compte"; dire(e.message, 1); } S.ticket = ""; S.tk = null; history.replaceState(null, "", location.pathname); }
   else if (d.nonticket){ S.arme = false; S.ticket = ""; S.tk = null; S.vue = "compte"; history.replaceState(null, "", location.pathname); dire(""); }
-  else if (d.fermer){ try { await api("/fermer", {}); } catch (e) {} S.jeton = ""; S.c = null; S.vue = "nom"; S.q = ""; S.trouves = []; if ($("cpt-vue")) $("cpt-vue").innerHTML = ""; mem.ecrire("jeton", null); mem.ecrire("qui", null); dire(""); }
+  else if (d.fermer){ try { await api("/fermer", {}); } catch (e) {} S.jeton = ""; S.c = null; S.vue = "nom"; S.q = ""; S.trouves = []; if ($("cpt-vue")) $("cpt-vue").innerHTML = ""; mem.ecrire("jeton", null); mem.ecrire("qui", null); if (window.BTCMembre) window.BTCMembre(null); dire(""); }
   dessiner(); });
 // déjà connecté sur ce téléphone : on retrouve le compte sans rien retaper (et on passe droit au paiement d'un QR code)
 (async () => { const j = mem.lire("jeton"), qui = mem.lire("qui");
-  if (j){ S.jeton = j; try { S.c = (await api("")).compte; S.vue = "compte"; await ticket(); return dessiner(); } catch (e) { S.jeton = ""; S.c = null; dire(""); } }
+  if (j){ S.jeton = j; try { const r0 = await api(window.BTCMembreManque && window.BTCMembreManque() ? "?m=1" : ""); S.c = r0.compte; if (window.BTCMembre) window.BTCMembre(r0.compte, r0.membre); S.vue = "compte"; await ticket(); return dessiner(); } catch (e) { S.jeton = ""; S.c = null; dire(""); } }
   if (qui && qui.uid){ S.qui = {uid: qui.uid, nom: qui.nom, premier: false}; S.vue = "code"; S.code = S.code1 = ""; dire(S.ticket ? "Tapez votre code pour payer." : ""); }
   dessiner(); })();
 return { monter: function () { dessiner(); }, ticket: function () { return !!S.ticket; } };
