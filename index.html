@@ -443,6 +443,76 @@ button.primary{font-size:20px!important;letter-spacing:.12em!important;box-shado
 .chr{gap:6px;flex-wrap:wrap}.chr button{flex:1 1 40%;min-height:40px;padding:6px 8px;font-size:14px}
 @media(max-width:480px){.liens{gap:4px!important;padding-left:6px!important;padding-right:6px!important;justify-content:space-between}.liens .link{padding:6px 7px!important;font-size:10.5px!important;letter-spacing:.02em!important;min-height:34px}.liens .vgrp{display:none}}
 .mur .liens{display:none!important}.mur #app.club3d .hero.on3d{height:100vh!important;height:100dvh!important}
+/* Mon compte (dans l'appli) */
+.cptr{--nuit:#070707;--mur:#121213;--mur2:#18181a;--trait:#2a2a2c;--craie:#f5f3f0;--gris:#a5a3a4;--or:#f0561d;--ok:#35d07f;--ko:#ff5d52;--titre:"Barlow Condensed","Arial Narrow",Arial,sans-serif;--texte:"Barlow","Helvetica Neue",Arial,sans-serif;--script:"Dancing Script",cursive;color:var(--craie);font:400 15px/1.35 var(--texte)}
+.cptr *{box-sizing:border-box}
+.cptr .simu{width:100%;background:#3a2a05;color:#ffd98a;border-bottom:1px solid #6b4d08;text-align:center;font:700 13px/1 var(--titre);letter-spacing:.14em;text-transform:uppercase;padding:9px 12px;flex:none}
+.cptr{flex:1;min-height:0;width:min(440px,100%);display:flex;flex-direction:column;gap:clamp(8px,1.6dvh,14px);padding:clamp(10px,2dvh,18px) 14px}
+.cptr .pas{display:flex;gap:6px;flex:none}
+.cptr .pas i{flex:1;height:4px;border-radius:2px;background:var(--trait)}
+.cptr .pas i.on{background:var(--or)}
+.cptr .carte{flex:1;min-height:0;background:linear-gradient(170deg,var(--mur2),var(--mur));border:1px solid var(--trait);border-radius:20px;padding:clamp(12px,2.2dvh,20px);display:flex;flex-direction:column;gap:clamp(8px,1.5dvh,14px);overflow:hidden}
+.cptr h1{font:700 clamp(20px,3.4dvh,26px)/1.1 var(--titre);letter-spacing:.04em;text-transform:uppercase;margin:0}
+.cptr p{margin:0;color:var(--gris)}
+.cptr button{font:700 15px/1 var(--titre);letter-spacing:.08em;text-transform:uppercase;color:var(--craie);background:var(--mur2);border:1px solid var(--trait);border-radius:14px;padding:clamp(11px,2dvh,16px) 14px;cursor:pointer}
+.cptr button:active{transform:scale(.98)}
+.cptr button.or{background:var(--or);border-color:var(--or);color:#160803}
+.cptr button:disabled{opacity:.4}
+.cptr .liste{display:grid;grid-template-columns:1fr 1fr;gap:7px;flex:1;min-height:0;align-content:start;overflow:hidden}
+.cptr .liste button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-transform:none;letter-spacing:0;font:600 15px/1.1 var(--texte);padding:10px 12px}
+.cptr .liste button span{color:var(--gris);font:600 13px/1 var(--titre)}
+.cptr .mont{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cptr .mont button{font-size:clamp(20px,3.6dvh,26px)}
+.cptr .mont button.on{border-color:var(--or);background:rgba(240,86,29,.16)}
+.cptr .recap{border:1px solid var(--trait);border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;gap:6px}
+.cptr .recap div{display:flex;justify-content:space-between;gap:10px}
+.cptr .recap b{font:700 17px/1 var(--titre)}
+.cptr .recap .tot b{font-size:clamp(26px,4.6dvh,34px);color:var(--or)}
+.cptr .cb{border-radius:16px;padding:14px 16px;background:linear-gradient(135deg,#2b2b2f,#17171a);border:1px dashed #6b4d08;display:flex;flex-direction:column;gap:8px}
+.cptr .cb em{font-style:normal;color:#ffd98a;font:700 11px/1 var(--titre);letter-spacing:.14em;text-transform:uppercase}
+.cptr .cb b{font:600 clamp(17px,3dvh,21px)/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.12em}
+.cptr .cb span{color:var(--gris);font-size:13px}
+.cptr .bas{margin-top:auto;display:flex;gap:8px}
+.cptr .bas button{flex:1}
+.cptr .bas button.ret{flex:0 0 auto}
+.cptr .big{font:700 clamp(40px,8dvh,60px)/1 var(--titre);color:var(--ok)}
+.cptr .rond{width:clamp(54px,9dvh,72px);height:clamp(54px,9dvh,72px);border-radius:50%;background:rgba(53,208,127,.16);border:2px solid var(--ok);display:grid;place-items:center;font-size:30px;color:var(--ok)}
+.cptr .tour{width:44px;height:44px;border-radius:50%;border:4px solid var(--trait);border-top-color:var(--or);animation:cptt 0.8s linear infinite;margin:auto}
+@keyframes cptt{to{transform:rotate(360deg)}}
+.cptr .err{color:var(--ko);min-height:18px;font-weight:600}
+.cptr *{touch-action:manipulation}
+.cptr input{font:inherit;font-size:16px;color:var(--craie);background:var(--mur2);border:1px solid var(--trait);border-radius:14px;padding:12px 14px;width:100%}
+.cptr .pts{display:flex;gap:12px;justify-content:center}
+.cptr .pts i{width:18px;height:18px;border-radius:50%;border:2px solid var(--gris)}
+.cptr .pts i.on{background:var(--or);border-color:var(--or)}
+.cptr .pave{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex:1;min-height:0}
+.cptr .pave button{font-size:clamp(20px,3.6dvh,28px);padding:0;min-height:0}
+.cptr .deux{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cptr .deux div{border:1px solid var(--trait);border-radius:14px;padding:10px 12px}
+.cptr .deux small{display:block;color:var(--gris);font:600 11px/1 var(--titre);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.cptr .deux b{font:700 clamp(26px,4.8dvh,36px)/1 var(--titre)}
+.cptr .deux .s b{color:var(--or)}
+.cptr .hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;flex:1;min-height:0;overflow:hidden}
+.cptr .hist li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--trait);border-radius:10px;padding:6px 10px;font-size:13px}
+.cptr .hist i{font-style:normal;color:var(--gris);font-size:12px}
+.cptr .hist b{font:700 15px/1 var(--titre)}
+.cptr .hist .up{color:var(--ok)}
+.cptr .ligne{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cptr .ligne small{color:var(--gris)}
+.cptr .ligne button{padding:6px 12px}
+.cptr .recu{border-style:dashed;background:rgba(255,255,255,.03)}
+.cptr .recu div:first-child{border-bottom:1px dashed var(--trait);padding-bottom:6px}
+.cptr .nb{display:grid;grid-template-columns:54px 1fr 54px;gap:8px;align-items:center}
+.cptr .nb button{height:48px;padding:0;font-size:24px;border-radius:14px}
+.cptr .nb span{text-align:center}
+.cptr .nb b{display:block;font:700 clamp(20px,3.4dvh,26px)/1 var(--titre)}
+.cptr .nb small{color:var(--gris)}
+.cptr .info{min-height:18px;font-weight:600;color:var(--ok)}
+.cptr .info.ko{color:var(--ko)}
+.cptr{width:min(440px,100%);margin:0 auto;height:calc(100dvh - 92px);min-height:420px;padding:0!important;display:flex;flex-direction:column;gap:10px}
+.cptr button{min-height:0;width:auto;backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none}
+.cptr h1{text-align:left}.cptr .simu{border-radius:12px;border:1px solid #6b4d08}
+#app:has(>.cptr){padding-bottom:0}
 </style>
 </head>
 <body>
@@ -1092,6 +1162,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     h = entete(esc(nom || 'Tireur'), st.retourT || 'general'); if (corps) corps += '<div class="card"><h2>Cartouches tirées</h2>' + cartHtml(k, st.membre && st.membre.k === k && st.membre.fusil ? st.membre.fusil.man : 0) + '</div>';
     return h + (corps || '<p class="muted">Aucune série enregistrée pour ce tireur.</p>');
   }
+  function vCompte() { return entete('Mon compte', 'accueil') + '<div class="cptr"><div class="simu" id="cpt-simu" hidden>Compte d\'essai · recharge par carte simulée · aucun paiement réel</div><section class="carte" id="cpt-vue"></section></div>'; }
   function vDirect() {
     var now = Date.now(), h = entete('Club-house', 'accueil');
     if (!HORS) return h + '<p class="muted">Cet écran fonctionne sur la version ouverte par le QR code.</p>';
@@ -1194,8 +1265,9 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) veille(); });
   function render() {
-    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral, direct: vDirect, pas: vPas, tireur: vTireur, membre: vMembre, avatar: vAvatar, fusil: vFusil, concours: vConcours, conc: vConc, securite: vSecu }[st.ecran] || vAccueil;
+    var v = { accueil: vAccueil, planche: vPlanche, tir: vTir, resultat: vResultat, historique: vHisto, licencies: vAccueil, club: vClub, general: vGeneral, direct: vDirect, pas: vPas, tireur: vTireur, membre: vMembre, compte: vCompte, avatar: vAvatar, fusil: vFusil, concours: vConcours, conc: vConc, securite: vSecu }[st.ecran] || vAccueil;
     app.innerHTML = v(); app.classList.toggle('large', st.ecran === 'direct'); veille();
+    if (st.ecran === 'compte' && window.BTCCompte) window.BTCCompte.monter();
     if (st.ecran !== ecranVu) { ecranVu = st.ecran; app.classList.remove('in'); void app.offsetWidth; app.classList.add('in'); }
     hero3d(); syn3d();
   }
@@ -1859,7 +1931,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'tireur') { st.tireur = b.dataset.k; st.retourT = st.ecran; st.ecran = 'tireur'; window.scrollTo(0, 0); }
     else if (a === 'dper') { st.dper = +b.dataset.k; st.dtic = 0; st.dfix = true; }
     else if (a === 'dtab') { st.dtab = b.dataset.k; }
-    else if (a === 'compte') { location.href = 'https://btc-gas.taildf2794.ts.net/compte'; return; } // solde, plateaux et paiement : sur la console du club, par son adresse internet fixe
+    else if (a === 'compte') { st.ecran = 'compte'; } // solde, plateaux et paiement, dans l'appli
     else if (a === 'xtout') { telecharger('btc-gas-feuilles-' + horodate() + '.csv', csvTout()); return; }
     else if (a === 'xgen') { telecharger('btc-gas-classement-' + horodate() + '.csv', csvGeneral()); return; }
     else if (a === 'xjson') { telecharger('btc-gas-sauvegarde-' + horodate() + '.json', jsonTout()); return; }
@@ -1878,8 +1950,72 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
 
   if (st.cours && st.cours.ack === undefined) st.cours.ack = 0;
   if (HORS && DIRECT_ON && /[?&]direct/.test(location.search)) st.ecran = 'direct';
+  if (/[?&](t=|compte)/.test(location.search)) st.ecran = 'compte'; // QR code de la caisse, ou lien direct vers son compte
   render(); brancher(); if (st.ecran === 'direct') dirGo();
   var qp = /[?&]pas=([ABC])/.exec(location.search); if (qp && st.ecran === 'accueil') ouvrirPas(qp[1] === 'B' ? 'FU' : 'DTL', qp[1]);
+})();
+</script>
+<script>
+/* ---- Mon compte : solde, plateaux, paiement (console du club, par son adresse fixe) ---- */
+window.BTCCompte = (function () {
+const BASE = "https://btc-gas.taildf2794.ts.net";
+const $ = id => document.getElementById(id), esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const eur = c => (c / 100).toLocaleString("fr-FR", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €";
+const S = {ticket: new URLSearchParams(location.search).get("t") || "", tk: null, vue: "nom", q: "", trouves: [], qui: null, code: "", code1: "", jeton: "", c: null, msg: "", ko: false, pg: 0, montant: 20};
+async function api(chemin, corps){ const r = await fetch(BASE + "/api/compte" + chemin, {method: corps ? "POST" : "GET", headers: {"Content-Type": "application/json", "X-Compte": S.jeton}, body: corps ? JSON.stringify(corps) : undefined}), j = await r.json().catch(() => ({}));
+  if (r.status === 401){ S.jeton = ""; S.vue = "nom"; S.c = null; mem.ecrire("jeton", null); } if (!r.ok) throw new Error(j.erreur || "Refusé"); return j; }
+const mem = { lire(k){ try { return JSON.parse(localStorage.getItem("btcgas-compte-" + k) || "null"); } catch (e) { return null; } }, ecrire(k, v){ try { v == null ? localStorage.removeItem("btcgas-compte-" + k) : localStorage.setItem("btcgas-compte-" + k, JSON.stringify(v)); } catch (e) {} } };
+const dire = (m, ko) => { S.msg = m || ""; S.ko = !!ko; };
+function dessiner(){
+  if (!$("cpt-vue")) return;
+  const V = $("cpt-vue"), c = S.c, info = `<p class="info ${S.ko ? "ko" : ""}">${esc(S.msg)}</p>`; $("cpt-simu").hidden = !(c && c.essai && S.vue !== "nom" && S.vue !== "code");
+  if (S.vue === "nom"){ if (!$("cpt-q")) V.innerHTML = `<h1>Bonjour</h1><p>${S.ticket ? "Pour payer, connectez-vous : tapez les premières lettres de votre nom." : "Tapez les premières lettres de votre nom."}</p><input id="cpt-q" placeholder="Votre nom" autocomplete="off" autocapitalize="words"><div class="liste" id="cpt-res" style="grid-template-columns:1fr"></div><div id="cpt-inf"></div>`;
+    $("cpt-res").innerHTML = S.trouves.map(x => `<button data-uid="${esc(x.uid)}">${esc(x.nom)}<span>${x.premier ? "Première ouverture : vous choisirez votre code" : "Compte n° " + esc(x.uid)}</span></button>`).join("") || (S.q.trim().length >= 2 ? "<p>Aucun compte à ce nom. Demandez au club-house.</p>" : ""); $("cpt-inf").innerHTML = info; return; }
+  if (S.vue === "code"){ const premier = S.qui.premier, etape2 = premier && S.code1;
+    V.innerHTML = `<h1>${esc(S.qui.nom)}</h1><p>${!premier ? "Votre code à 4 chiffres, le même qu'au pas de tir." : etape2 ? "Retapez votre code pour confirmer." : "Première ouverture : choisissez votre code à 4 chiffres. Il servira aussi au pas de tir."}</p><div class="pts">${[0, 1, 2, 3].map(i => `<i class="${i < S.code.length ? "on" : ""}"></i>`).join("")}</div>${info}<div class="pave">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-n="${n}">${n}</button>`).join("")}<button data-vue="nom">‹</button><button data-n="0">0</button><button data-n="x">⌫</button></div>`; return; }
+  if (S.vue === "payer"){ const t = S.tk; V.innerHTML = `<h1>Payer au club-house</h1><div class="recap">${t.lignes.slice(0, 5).map(l => `<div><span>${esc(l.nom)}${l.qte > 1 ? " × " + l.qte : ""}</span><b>${eur(l.prix)}</b></div>`).join("")}${t.lignes.length > 5 ? `<div><span>… et ${t.lignes.length - 5} autre(s)</span></div>` : ""}<div class="tot"><span>Total</span><b>${eur(t.total)}</b></div></div><div class="recap"><div><span>Mon solde</span><b>${eur(c.solde)}</b></div></div>${c.solde < t.total ? `<p class="info ko">Solde insuffisant : il manque ${eur(t.total - c.solde)}. Rechargez au club-house.</p>` : info}<div class="bas"><button data-nonticket="1">Refuser</button><button class="or" id="cpt-payertk"${c.solde >= t.total ? "" : " disabled"}>${S.arme ? "Confirmer le paiement de " + eur(t.total) : "Payer " + eur(t.total)}</button></div>`; return; }
+  if (S.vue === "recu"){ const t = S.recu, q = new Date(t.quand); V.innerHTML = `<div class="ligne"><h1>Ticket</h1><small>${q.toLocaleDateString("fr-FR")} · ${q.toLocaleTimeString("fr-FR", {hour: "2-digit", minute: "2-digit"})}</small></div><div class="recap recu"><div><span>Ball Trap Club de Gas</span><b>${esc(c.nom)}</b></div>${t.lignes.slice(0, 7).map(l => `<div><span>${esc(l.nom)}${l.qte > 1 ? " × " + l.qte : ""}</span><b>${eur(l.prix)}</b></div>`).join("")}${t.lignes.length > 7 ? `<div><span>… et ${t.lignes.length - 7} autre(s)</span></div>` : ""}<div class="tot"><span>Total payé</span><b>${eur(t.total)}</b></div><div><span>Réglé avec</span><b>${esc(t.moyen)}</b></div></div>${t.frais ? `<div class="recap"><div><span>Nouveau solde</span><b>${eur(c.solde)}</b></div></div><p class="info">Paiement validé. Merci !</p>` : ""}<div class="bas"><button class="or" data-vue="compte">Retour à mon compte</button></div>`; return; }
+  if (S.vue === "compte"){ const MOYC = {compte: "mon compte", especes: "espèces", carte: "carte", cheque: "chèque", virement: "virement"}, E = []; c.ecritures.forEach(e => { const d = E[E.length - 1]; if (e.type === "vente" && e.montant > 0 && d && d.tk && d.quand === e.quand && d.moyen === e.moyen){ d.lignes.push(e); d.montant += e.montant; } else E.push(e.type === "vente" && e.montant > 0 ? {tk: 1, quand: e.quand, moyen: e.moyen, type: "vente", montant: e.montant, lignes: [e]} : e); }); S.E = E;
+    const par = innerHeight < 700 ? 2 : innerHeight < 820 ? 3 : 5, pages = Math.max(1, Math.ceil(E.length / par)); S.pg = Math.min(S.pg, pages - 1); const s = c.series[0], nbMax = s ? Math.max(1, Math.min(20, Math.floor(c.solde / s.prix))) : 1; S.nb = Math.max(1, Math.min(S.nb || 1, nbMax));
+    V.innerHTML = `<div class="ligne"><h1>${esc(c.nom)}</h1><button data-fermer="1">Quitter</button></div><div class="deux"><div class="s"><small>Mon solde</small><b>${eur(c.solde)}</b></div><div><small>Mes plateaux</small><b>${c.plateaux}</b></div></div>
+      ${s && !S.arme ? `<div class="nb"><button data-nb="-1"${S.nb > 1 ? "" : " disabled"}>−</button><span><b>${S.nb * s.plateaux} plateaux</b><small>${S.nb} série${S.nb > 1 ? "s" : ""} de ${s.plateaux}</small></span><button data-nb="1"${S.nb < nbMax && c.solde >= s.prix ? "" : " disabled"}>+</button></div>` : ""}<div class="bas" style="margin:0;flex-wrap:wrap">${s ? `<button class="or" style="flex:1 0 100%" data-serie="${esc(s.id)}"${c.solde >= s.prix ? "" : " disabled"}>${S.arme ? `Confirmer : ${S.nb * s.plateaux} plateaux pour ${eur(s.prix * S.nb)} ?` : `Prendre ${S.nb * s.plateaux} plateaux · ${eur(s.prix * S.nb)}`}</button>${S.arme ? '<button style="flex:1 0 100%" data-desarme="1">Non, annuler</button>' : ""}` : ""}${S.arme ? "" : '<button style="flex:1 0 100%" data-vue="recharge">Recharger mon compte</button>'}</div>${info}
+      <div class="ligne"><small>Mes mouvements · ${c.tires} plateaux tirés</small><span><button data-pg="-1"${S.pg ? "" : " disabled"}>‹</button> <button data-pg="1"${S.pg < pages - 1 ? "" : " disabled"}>›</button></span></div>
+      <ul class="hist">${E.slice(S.pg * par, S.pg * par + par).map((e, i) => e.tk ? `<li data-recu="${S.pg * par + i}" style="cursor:pointer"><i>${e.quand.slice(8, 10)}/${e.quand.slice(5, 7)}</i><span>${e.lignes.length > 1 ? "Ticket · " + e.lignes.length + " articles" : esc(e.lignes[0].libelle) + (e.lignes[0].qte > 1 ? " × " + e.lignes[0].qte : "")} ›</span><b>− ${eur(e.montant)}</b></li>` : `<li><i>${e.quand.slice(8, 10)}/${e.quand.slice(5, 7)}</i><span>${esc(e.libelle)}${e.qte > 1 ? " × " + e.qte : ""}</span><b class="${e.type === "recharge" ? "up" : ""}">${e.type === "recharge" ? "+ " : "− "}${eur(Math.abs(e.montant))}</b></li>`).join("") || "<li><span>Aucun mouvement pour l'instant.</span></li>"}</ul>`; return; }
+  if (S.vue === "recharge"){ V.innerHTML = `<h1>Recharger</h1><div class="recap"><div><span>Mon solde</span><b>${eur(c.solde)}</b></div></div>` + (c.essai
+      ? `<p>Par carte (simulation sur ce compte d'essai) :</p><div class="mont">${[10, 20, 30, 50, 75, 100].map(m => `<button data-m="${m}" class="${S.montant === m ? "on" : ""}">${m} €</button>`).join("")}</div><div class="cb"><em>Carte de démonstration</em><b>0000 0000 0000 0000</b><span>Dans la vraie version, la carte se saisit sur la page sécurisée du prestataire de paiement du club.</span></div>${info}<div class="bas"><button class="ret" data-vue="compte">‹</button><button class="or" id="cpt-payer">Payer ${S.montant} € (simulation)</button></div>`
+      : `<p><b style="color:var(--craie)">Au club-house</b><br>Réglez en espèces, par chèque ou par carte : le responsable crédite votre compte aussitôt.</p><p><b style="color:var(--craie)">Par carte depuis ce téléphone</b><br>Bientôt disponible, dès que le club aura ouvert son compte de paiement en ligne.</p>${info}<div class="bas"><button data-vue="compte">‹ Retour</button></div>`); return; }
+  V.innerHTML = `<h1>Paiement en cours</h1><div class="tour"></div>`;
+}
+async function ticket(){ if (!S.ticket) return; try { S.tk = await api("/ticket/" + encodeURIComponent(S.ticket)); S.vue = "payer"; } catch (e) { S.ticket = ""; dire("Ce ticket n'est plus valable : demandez un nouveau QR code.", 1); } }
+let tq = 0;
+document.addEventListener("input", ev => { if (ev.target.id !== "cpt-q") return; S.q = ev.target.value; clearTimeout(tq); tq = setTimeout(async () => { try { S.trouves = S.q.trim().length < 2 ? [] : (await api("/chercher?q=" + encodeURIComponent(S.q))).comptes; dire(""); } catch (e) { dire(e.message, 1); } dessiner(); }, 250); });
+async function valider(){ const q = S.qui, code = S.code; S.code = "";
+  if (q.premier && !S.code1){ S.code1 = code; dire(""); return; }
+  if (q.premier && S.code1 !== code){ S.code1 = ""; dire("Les deux codes sont différents : recommencez.", 1); return; }
+  try { const j = await api("/ouvrir", {uid: q.uid, code, nouveau: !!q.premier}); S.jeton = j.jeton; S.c = j.compte; S.vue = "compte"; S.code1 = ""; S.pg = 0; mem.ecrire("jeton", S.jeton); mem.ecrire("qui", {uid: q.uid, nom: q.nom}); dire(q.premier ? "Code enregistré." : ""); await ticket(); } catch (e) { S.code1 = ""; dire(e.message, 1); } }
+document.addEventListener("click", async ev => { if (!ev.target.closest || !ev.target.closest("#cpt-vue")) return; const li = ev.target.closest("li[data-recu]"); if (li){ const e = S.E[+li.dataset.recu], M2 = {compte: "mon compte", especes: "espèces", carte: "carte", cheque: "chèque", virement: "virement"}; S.recu = {quand: e.quand, lignes: e.lignes.map(l => ({nom: l.libelle, qte: l.qte, prix: l.montant})), total: e.montant, moyen: M2[e.moyen] || e.moyen}; S.vue = "recu"; return dessiner(); }
+  const b = ev.target.closest("button"); if (!b) return; const d = b.dataset;
+  if (d.uid){ S.qui = S.trouves.find(x => x.uid === d.uid); S.vue = "code"; S.code = S.code1 = ""; dire(""); }
+  else if (d.n){ if (d.n === "x") S.code = S.code.slice(0, -1); else if (S.code.length < 4) S.code += d.n; if (S.code.length === 4){ dessiner(); await valider(); } }
+  else if (d.vue){ S.vue = d.vue; dire(""); if (S.vue === "nom"){ S.q = ""; S.trouves = []; if ($("cpt-vue")) $("cpt-vue").innerHTML = ""; } }
+  else if (d.pg) S.pg += +d.pg;
+  else if (d.m) S.montant = +d.m;
+  else if (d.desarme) S.arme = false;
+  else if (d.nb) S.nb = (S.nb || 1) + +d.nb;
+  else if (d.serie && !S.arme){ S.arme = true; dire(""); }
+  else if (d.serie){ S.arme = false; try { const n = S.nb || 1; S.c = (await api("/serie", {article: d.serie, qte: n})).compte; S.nb = 1; dire(n > 1 ? n + " séries ajoutées à votre compte." : "Série ajoutée à votre compte."); } catch (e) { dire(e.message, 1); } }
+  else if (b.id === "cpt-payer"){ S.vue = "attente"; dessiner(); const att = new Promise(r => setTimeout(r, 1300)); try { const j = await api("/recharge-demo", {montant: S.montant}); await att; S.c = j.compte; S.vue = "compte"; S.pg = 0; dire("Compte rechargé : + " + eur(S.montant * 100)); } catch (e) { S.vue = S.c ? "recharge" : "nom"; dire(e.message, 1); } }
+  else if (b.id === "cpt-payertk" && !S.arme){ S.arme = true; }
+  else if (b.id === "cpt-payertk"){ S.arme = false; try { S.c = (await api("/payer", {ticket: S.ticket})).compte; S.recu = {quand: new Date().toISOString(), lignes: S.tk.lignes, total: S.tk.total, moyen: "mon compte", frais: 1}; S.vue = "recu"; S.pg = 0; dire(""); } catch (e) { S.vue = "compte"; dire(e.message, 1); } S.ticket = ""; S.tk = null; history.replaceState(null, "", location.pathname); }
+  else if (d.nonticket){ S.arme = false; S.ticket = ""; S.tk = null; S.vue = "compte"; history.replaceState(null, "", location.pathname); dire(""); }
+  else if (d.fermer){ try { await api("/fermer", {}); } catch (e) {} S.jeton = ""; S.c = null; S.vue = "nom"; S.q = ""; S.trouves = []; if ($("cpt-vue")) $("cpt-vue").innerHTML = ""; mem.ecrire("jeton", null); mem.ecrire("qui", null); dire(""); }
+  dessiner(); });
+// déjà connecté sur ce téléphone : on retrouve le compte sans rien retaper (et on passe droit au paiement d'un QR code)
+(async () => { const j = mem.lire("jeton"), qui = mem.lire("qui");
+  if (j){ S.jeton = j; try { S.c = (await api("")).compte; S.vue = "compte"; await ticket(); return dessiner(); } catch (e) { S.jeton = ""; S.c = null; dire(""); } }
+  if (qui && qui.uid){ S.qui = {uid: qui.uid, nom: qui.nom, premier: false}; S.vue = "code"; S.code = S.code1 = ""; dire(S.ticket ? "Tapez votre code pour payer." : ""); }
+  dessiner(); })();
+return { monter: function () { dessiner(); }, ticket: function () { return !!S.ticket; } };
 })();
 </script>
 </body>
