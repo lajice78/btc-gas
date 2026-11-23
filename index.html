@@ -2031,5 +2031,19 @@ document.addEventListener("click", async ev => { if (!ev.target.closest || !ev.t
 return { monter: function () { dessiner(); }, ticket: function () { return !!S.ticket; } };
 })();
 </script>
+<script>
+/* Page « Mon compte » : sa hauteur est mesurée sur l'écran réel du téléphone (barres du navigateur, encoche,
+   bandeau du haut sur une ou deux lignes), pour que le bouton du bas soit toujours entier à l'écran. */
+(function(){
+  var sonde = document.createElement('div'); sonde.style.cssText = 'position:fixed;left:0;bottom:0;width:0;height:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none';
+  document.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(sonde); });
+  function ajuster(){ var el = document.querySelector('.cptr'); if (!el) return;
+    var vv = window.visualViewport, h = vv ? vv.height : window.innerHeight, t = el.getBoundingClientRect().top;
+    var v = Math.max(280, Math.floor(h - t - 10 - (sonde.offsetHeight || 0))) + 'px';
+    if (el.style.height !== v){ el.style.minHeight = '0'; el.style.flex = 'none'; el.style.height = v; } }
+  setInterval(ajuster, 250); window.addEventListener('resize', ajuster);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', ajuster);
+})();
+</script>
 </body>
 </html>
