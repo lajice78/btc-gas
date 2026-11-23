@@ -673,6 +673,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
       tireurs.push({ nom: connu ? st.lic[id].nom : nom, statut: connu ? 'licencie' : 'invite' });
     }
     if (!tireurs.length) { st.msg = 'Inscrivez au moins un tireur.'; return render(); }
+    if (!attente && pasPris(p.disc, p.pas)) { st.msg = 'Une planche est déjà en cours sur ' + nomPas(p.disc, p.pas) + '. Touchez « Préparer pour plus tard » : elle passera dès que le pas sera libre.'; return render(); }
     var nv = { id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), disc: p.disc, pas: p.pas || '', date: Date.now(), tireurs: tireurs, tirs: [], ack: 0 };
     if (p.conc) { nv.concours = p.conc.id; nv.manche = p.conc.m; nv.groupe = p.conc.g; }
     var J0 = new Date(); J0.setHours(0, 0, 0, 0); var tj = J0.getTime(), ta = new Date(J0.getFullYear(), 0, 1).getTime(), pre = nv.pas || nv.disc, seq = 0, nAn = 0, mxNo = 0, vus = {};
@@ -909,6 +910,11 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (HORS) Object.keys(st.direct || {}).forEach(function (id) { var d = st.direct[id]; if (vu[id] || st.ses[id] || !d || !d.tireurs || !d.tirs || !bon(d) || !(d.maj > now - 12 * 3600000) || d.tirs.length >= d.tireurs.length * NB) return; L.push({ s: Object.assign({ id: id }, d), e: d.tel === ME ? 'moi' : (d.tirs.length && d.maj > now - VERROU) ? 'occupe' : 'libre' }); });
     return L.sort(function (p, q) { return p.s.date - q.s.date; });
   }
+  // une seule planche à la fois par pas de tir : celle qui est commencée (sur ce téléphone, un autre, ou la console) bloque les suivantes
+  function pasPris(disc, pas, sauf) {
+    if (!pas) return null;
+    return enCoursAu(disc, pas).filter(function (x) { var n = x.s.tirs.length; if (x.s.id === sauf || n >= x.s.tireurs.length * NB) return false; return (st.cours && st.cours.id === x.s.id && st.ecran === 'tir') || (n > 0 && x.e !== 'libre'); })[0] || null;
+  }
   function vPas() {
     var v = st.pasVu || { disc: 'DTL', pas: '' }, L = enCoursAu(v.disc, v.pas), occ = L.some(function (x) { return x.e === 'occupe'; });
     var h = entete(nomPas(v.disc, v.pas), 'accueil') + (v.pas ? lancAlerte(v.pas) : '');
@@ -916,6 +922,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     var att = 0; L.forEach(function (x) { var c = x.s, e = etat(c);
       var rg = e.n ? 0 : ++att; h += '<div class="card"><h2>' + (c.num ? numAff(c.num) + ' · ' : '') + (e.n ? 'en cours' : rg === 1 ? 'prochaine à passer' : rg + 'e à passer') + '</h2>' + (c.no ? '<p class="small muted">Planche n° ' + ('000' + c.no).slice(-4) + ' de l\'année</p>' : '') + '<p><b>' + esc(c.tireurs.map(function (t) { return nomCourt(t.nom); }).join(', ')) + '</b><br><span class="small muted">' + (e.n ? 'Commencée à ' + fdate(c.date).slice(11) + ' · ' + e.n + ' tirs notés sur ' + e.total : 'Préparée à ' + fdate(c.date).slice(11) + ', pas encore commencée') + '</span></p>';
       if (x.e === 'occupe') h += '<p class="muted">Notation en cours sur un autre téléphone : cette planche ne peut pas être reprise ici.</p>' + (DIRECT_ON ? '<button data-act="aller" data-e="direct">Suivre en direct</button>' : '');
+      else if (!e.n && pasPris(v.disc, v.pas, c.id)) h += '<p class="muted">Une planche est en cours sur ce pas de tir : celle-ci pourra être lancée dès qu\'elle sera terminée.</p><div class="row"><button style="flex:1" data-act="abandon" data-id="' + c.id + '">Abandonner</button></div>';
       else h += (x.e === 'libre' && e.n ? '<p class="small muted">Lancée sur un autre téléphone, sans activité depuis plus de ' + Math.round(VERROU / 60000) + ' minutes.</p>' : '') + '<div class="row"><button class="primary" style="flex:1" data-act="reprendre" data-id="' + c.id + '">' + (e.n ? 'Reprendre' + (x.e === 'libre' ? ' sur ce téléphone' : '') : 'Noter cette planche') + '</button><button style="flex:1" data-act="abandon" data-id="' + c.id + '">Abandonner</button></div>';
       h += '</div>'; });
     h += '<button class="' + (L.length ? 'ghost' : 'primary') + '" data-act="nouvforce">' + (L.length ? 'Préparer une autre planche' : 'Nouvelle planche') + '</button>';
@@ -1582,6 +1589,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'annuler') { s = st.cours; if (s && s.tirs.length) { if (SY) SY.stop(); s.tirs.pop(); s.ack = 0; if (etat(s).rotation) s.ack = s.tirs.length; saveLocal(); vivre(); } }
     else if (a === 'pret') { st.cours.ack = st.cours.tirs.length; saveLocal(); direTireur(); }
     else if (a === 'abandon') { var ai = b.dataset.id || (st.cours && st.cours.id); if (ai) { mort(ai); if (st.cours && st.cours.id === ai) st.cours = null; delete st.pauses[ai]; if (st.direct) delete st.direct[ai]; saveLocal(); } }
+    else if (a === 'reprendre' && (function () { var q = st.pauses[b.dataset.id] || (st.direct && st.direct[b.dataset.id]); return q && !(q.tirs && q.tirs.length) && pasPris(q.disc, q.pas || '', b.dataset.id); })()) { }
     else if (a === 'reprendre') { var ri = b.dataset.id, dr = st.direct && st.direct[ri], pris = dr && dr.tel && dr.tel !== ME && dr.tirs && dr.tirs.length && dr.maj > Date.now() - VERROU, rs = pris ? null : (st.cours && st.cours.id === ri) ? st.cours : st.pauses[ri] || (st.direct && st.direct[ri] ? { id: ri, disc: st.direct[ri].disc, pas: st.direct[ri].pas || '', date: st.direct[ri].date, tireurs: st.direct[ri].tireurs, tirs: st.direct[ri].tirs.slice(), ack: st.direct[ri].tirs.length, num: st.direct[ri].num || '', no: st.direct[ri].no || 0, concours: st.direct[ri].concours || '', manche: st.direct[ri].manche || 0, groupe: st.direct[ri].groupe || 0 } : null);
       if (rs) { if (st.cours && st.cours.id !== ri) st.pauses[st.cours.id] = st.cours; delete st.pauses[ri]; st.cours = rs; rs.pris = Date.now(); if (rs.ack === undefined) rs.ack = 0; saveLocal(); vivre(); st.ecran = 'tir'; window.scrollTo(0, 0); } }
     else if (0) {}
