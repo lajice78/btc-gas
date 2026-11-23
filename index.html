@@ -396,6 +396,33 @@ button.primary{font-size:20px!important;letter-spacing:.12em!important;box-shado
 .item button.primary,.row button.primary{font-size:15px!important;letter-spacing:.1em!important}
 .kpi b{font-family:var(--display)!important;font-weight:700!important;color:var(--accent)!important;font-variant-numeric:tabular-nums}
 .kpi span{font-family:var(--display);font-weight:500;letter-spacing:.12em}
+/* accueil : tout tient dans l'écran (ou la fenêtre du mur), sans défilement */
+#app.club3d{padding-bottom:0!important;gap:0!important}
+#app.club3d .hero.on3d{height:calc(100vh - 52px)!important;height:calc(100dvh - 52px)!important}
+#app.club3d .liens{flex-wrap:nowrap!important;height:52px;margin:0!important;padding:0 4px!important;gap:6px!important;overflow:hidden}
+#app.club3d .liens button.link,#app.club3d .liens a{font-size:12px;padding:5px 10px;min-height:30px;white-space:nowrap}
+#app.club3d .liens button.link:last-child{border:0;background:none;font-size:11px;padding:5px 4px;opacity:.7}
+/* écran de tir : tout tient dans l'écran, sans glisser ; la vue 3D prend la place qui reste */
+#app:has(>.tirv){height:100vh;height:100dvh;padding-bottom:0!important;gap:6px!important;overflow:hidden}
+#app:has(>.tirv)>*{flex:none}
+#app:has(>.tirv)>p.small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0}
+#app>.tirv{flex:1 1 0!important;min-height:0;margin-top:0;gap:7px;padding-bottom:8px}
+.tirv>*{flex:none}
+.tirv .vgrp{margin:-2px 0}
+.tirv .syn{flex:1 1 0;height:auto!important;min-height:84px;border-radius:20px}
+.tirv .now{padding:9px 16px!important;border-radius:20px!important;gap:0}
+.tirv .now .nom{font-size:clamp(24px,7.4vw,36px)!important;margin:1px 0!important}
+.tirv .now .ctx{font-size:13.5px}
+.tirv .shots{gap:6px!important}
+.tirv .shots button{min-height:clamp(44px,7dvh,66px)!important;border-radius:18px!important}
+.tirv .shots button b{font-size:clamp(26px,4.6dvh,36px)!important}
+.tirv>.row{min-height:0;flex-wrap:nowrap;gap:6px}
+.tirv>.row .small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tirv>.row .link{white-space:nowrap;flex:none}
+.tirv>.card{padding:6px 12px!important;gap:0!important;border-radius:16px}
+.tirv .board .l{padding:2px 0!important;min-height:0!important;font-size:14px}
+.tirv .board .m{width:23px!important;height:23px!important;font-size:12px}
+@media (max-height:700px){.tirv .board .l:not(.cur){display:none}.tirv .now .ctx{display:none}}
 </style>
 </head>
 <body>
@@ -687,7 +714,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   }
   /* ---- planches en cours, visibles en direct au club-house ---- */
   var dirT = null, DIRECT_ON = true;
-  function vivre(s0) { var s = s0 || st.cours; if (!HORS || !DIRECT_ON || !s) return; fetch(FB + 'direct/' + encodeURIComponent(s.id), { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc({ disc: s.disc, pas: s.pas || '', date: s.date, maj: Date.now(), tel: ME, num: s.num || '', no: s.no || 0, concours: s.concours || '', manche: s.manche || 0, groupe: s.groupe || 0, tireurs: s.tireurs, tirs: s.tirs }).mapValue.fields }) }).catch(function () {}); }
+  function vivre(s0) { var s = s0 || st.cours; if (!HORS || !DIRECT_ON || !s) return; if (s === st.cours) s.go = 1; // démarrée : elle occupe le pas, même avant le premier tir
+ fetch(FB + 'direct/' + encodeURIComponent(s.id), { method: 'PATCH', headers: fbTete(), body: JSON.stringify({ fields: fbEnc({ disc: s.disc, pas: s.pas || '', date: s.date, maj: Date.now(), tel: ME, num: s.num || '', no: s.no || 0, concours: s.concours || '', manche: s.manche || 0, groupe: s.groupe || 0, tireurs: s.tireurs, tirs: s.tirs, go: s.go ? 1 : 0 }).mapValue.fields }) }).catch(function () {}); }
   function mort(id) { if (!HORS || !DIRECT_ON || !id) return; fetch(FB + 'direct/' + encodeURIComponent(id), { method: 'DELETE' }).catch(function () {}); }
   function fbDirect() { if (!HORS || !DIRECT_ON) return; fbListe('direct', '', {}).then(function (d) { var av = Object.keys(st.direct || {}).join(); st.direct = d; setTimeout(direProch, 0); var parti = false, ailleurs = function (c) { return c && d[c.id] && d[c.id].tel && d[c.id].tel !== ME && !(c.pris > Date.now() - 20000); };
     Object.keys(st.pauses).forEach(function (id) { if (ailleurs(st.pauses[id])) { delete st.pauses[id]; parti = true; } }); if (ailleurs(st.cours)) { st.cours = null; parti = true; if (st.ecran === 'tir') st.ecran = 'accueil'; } if (parti) saveLocal();
@@ -980,13 +1008,13 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   function enCoursAu(disc, pas) {
     var L = [], now = Date.now(), vu = {}, bon = function (c) { return c && c.disc === disc && (c.pas || '') === (pas || ''); };
     [st.cours].concat(Object.keys(st.pauses).map(function (id) { return st.pauses[id]; })).forEach(function (c) { if (bon(c) && !vu[c.id]) { vu[c.id] = 1; L.push({ s: c, e: 'moi' }); } });
-    if (HORS) Object.keys(st.direct || {}).forEach(function (id) { var d = st.direct[id]; if (vu[id] || st.ses[id] || !d || !d.tireurs || !d.tirs || !bon(d) || !(d.maj > now - 12 * 3600000) || d.tirs.length >= d.tireurs.length * NB) return; L.push({ s: Object.assign({ id: id }, d), e: d.tel === ME ? 'moi' : (d.tirs.length && d.maj > now - VERROU) ? 'occupe' : 'libre' }); });
+    if (HORS) Object.keys(st.direct || {}).forEach(function (id) { var d = st.direct[id]; if (vu[id] || st.ses[id] || !d || !d.tireurs || !d.tirs || !bon(d) || !(d.maj > now - 12 * 3600000) || (d.console && !(d.maj > now - 120000)) || d.tirs.length >= d.tireurs.length * NB) return; L.push({ s: Object.assign({ id: id }, d), e: d.tel === ME ? 'moi' : ((d.tirs.length || d.go || /^console-/.test(d.tel || '')) && d.maj > now - VERROU) ? 'occupe' : 'libre' }); });
     return L.sort(function (p, q) { return p.s.date - q.s.date; });
   }
   // une seule planche à la fois par pas de tir : celle qui est commencée (sur ce téléphone, un autre, ou la console) bloque les suivantes
   function pasPris(disc, pas, sauf) {
     if (!pas) return null;
-    return enCoursAu(disc, pas).filter(function (x) { var n = x.s.tirs.length; if (x.s.id === sauf || n >= x.s.tireurs.length * NB) return false; return (st.cours && st.cours.id === x.s.id && st.ecran === 'tir') || (n > 0 && x.e !== 'libre'); })[0] || null;
+    return enCoursAu(disc, pas).filter(function (x) { var n = x.s.tirs.length; if (x.s.id === sauf || n >= x.s.tireurs.length * NB) return false; return (st.cours && st.cours.id === x.s.id) || n > 0 || !!x.s.go || /^console-/.test(x.s.tel || ''); })[0] || null; // démarrée et pas finie, même si son téléphone ne note plus : elle se reprend au pas de tir
   }
   function vPas() {
     var v = st.pasVu || { disc: 'DTL', pas: '' }, L = enCoursAu(v.disc, v.pas), occ = L.some(function (x) { return x.e === 'occupe'; });
@@ -994,7 +1022,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     if (!L.length) h += '<p class="muted">Aucune planche en cours ici.</p>';
     var att = 0; L.forEach(function (x) { var c = x.s, e = etat(c);
       var rg = e.n ? 0 : ++att; h += '<div class="card"><h2>' + (c.num ? numAff(c.num) + ' · ' : '') + (e.n ? 'en cours' : rg === 1 ? 'prochaine à passer' : rg + 'e à passer') + '</h2>' + (c.no ? '<p class="small muted">Planche n° ' + ('000' + c.no).slice(-4) + ' de l\'année</p>' : '') + '<p><b>' + esc(c.tireurs.map(function (t) { return nomCourt(t.nom); }).join(', ')) + '</b><br><span class="small muted">' + (e.n ? 'Commencée à ' + fdate(c.date).slice(11) + ' · ' + e.n + ' tirs notés sur ' + e.total : 'Préparée à ' + fdate(c.date).slice(11) + ', pas encore commencée') + '</span></p>';
-      if (x.e === 'occupe') h += '<p class="muted">Notation en cours sur un autre téléphone : cette planche ne peut pas être reprise ici.</p>' + (DIRECT_ON ? '<button data-act="aller" data-e="direct">Suivre en direct</button>' : '');
+      if (x.e === 'occupe') h += '<p class="muted">Notation en cours ' + (/^console-/.test(c.tel || '') ? 'à la console du pas de tir' : 'sur un autre téléphone') + ' : cette planche ne peut pas être reprise ici.</p>' + (DIRECT_ON ? '<button data-act="aller" data-e="direct">Suivre en direct</button>' : '');
       else if (!e.n && pasPris(v.disc, v.pas, c.id)) h += '<p class="muted">Une planche est en cours sur ce pas de tir : celle-ci pourra être lancée dès qu\'elle sera terminée.</p><div class="row"><button style="flex:1" data-act="abandon" data-id="' + c.id + '">Abandonner</button></div>';
       else h += (x.e === 'libre' && e.n ? '<p class="small muted">Lancée sur un autre téléphone, sans activité depuis plus de ' + Math.round(VERROU / 60000) + ' minutes.</p>' : '') + '<div class="row"><button class="primary" style="flex:1" data-act="reprendre" data-id="' + c.id + '">' + (e.n ? 'Reprendre' + (x.e === 'libre' ? ' sur ce téléphone' : '') : 'Noter cette planche') + '</button><button style="flex:1" data-act="abandon" data-id="' + c.id + '">Abandonner</button></div>';
       h += '</div>'; });
@@ -1225,7 +1253,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
         if (mats.length !== vus) { vus = mats.length; matieres(); }
         if (sc.environment && (nEnv++ % 120 === 0)) envI();
         if (dedans || scene !== sc || qual() !== 'haute' || !r.capabilities.isWebGL2 && !r.extensions.get('EXT_color_buffer_half_float')) return brut(scene, cam);
-        r.getSize(taille); var pr = Math.min(r.getPixelRatio(), tactile ? 1.5 : 2);
+        r.getSize(taille); var pr = Math.min(r.getPixelRatio(), 1.5);
         if (!taille.x || !taille.y) return brut(scene, cam);
         try { if (!comp || taille.x !== Wc || taille.y !== Hc || pr !== PRc) construire(taille.x, taille.y, pr); rp.camera = cam; dedans = true; comp.render(); }
         catch (e) { lent0(); dedans = false; return brut(scene, cam); }
@@ -1397,8 +1425,8 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     var calme = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     function taille() { var w = cv.clientWidth, h = cv.clientHeight; if (!w || !h || (w === W && h === H)) return; W = w; H = h; r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
     function dessin(t) {
-      taille(); var f = Math.max(1, 1.3 / cam.aspect), ang = calme ? 0 : Math.sin(t * 0.22) * 0.14 + mx * 0.25, cx = 3, cz = 5, R = 74 * f;
-      cam.position.set(cx - Math.sin(0.55 + ang) * R, 46 * f - my * 6, cz + Math.cos(0.55 + ang) * R); cam.lookAt(cx, 2, cz); if (API && API.camf) API.camf(cam, t);
+      taille(); var f = Math.max(1, 1.3 / cam.aspect), ang = calme ? 0 : Math.sin(t * 0.22) * 0.14, cx = 3, cz = 5, R = 74 * f; // la vue tourne doucement toute seule, elle ne suit plus la souris
+      cam.position.set(cx - Math.sin(0.55 + ang) * R, 46 * f, cz + Math.cos(0.55 + ang) * R); cam.lookAt(cx, 2, cz); if (API && API.camf) API.camf(cam, t);
       var c = Math.floor(t / 3.2) % 3, u = (t % 3.2), p = PAS[c], vol = u < 1.5, ec = u - 1.5;
       clay.visible = vol; if (vol) { clay.position.set(p.t[0] + p.d[0] * 30 * u, 1.2 + 22 * u - 9 * u * u, p.t[1] + p.d[1] * 30 * u); clay.rotation.y = t * 12; }
       fr.forEach(function (q) { q.visible = ec >= 0 && ec < 0.8; if (q.visible) { var w = q.userData.v, bx = p.t[0] + p.d[0] * 45, bz = p.t[1] + p.d[1] * 45; q.position.set(bx + w.x * ec, 13.95 + w.y * ec - 12 * ec * ec, bz + w.z * ec); q.rotation.set(ec * 8, ec * 6, 0); } });
