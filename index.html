@@ -442,6 +442,7 @@ button.primary{font-size:20px!important;letter-spacing:.12em!important;box-shado
 .chc{gap:0;padding:10px 14px}.chc h2{margin:0 0 2px;font-size:17px}.chc .rank,.chc .rank.first{padding:5px 0;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;background:none;border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;margin:0}.chc .rank:last-child{border-bottom:0}.chc .rank .rg{width:26px;height:26px;min-width:0;font-size:13px;line-height:26px;box-shadow:none}.chc .rank b{font-size:15px}.chc .rank .sc{font-size:20px}.chc .rank .sc small{font-size:11px}.chc .rank.first .rg{background:var(--accent);color:var(--on-accent)}
 .chr{gap:6px;flex-wrap:wrap}.chr button{flex:1 1 40%;min-height:40px;padding:6px 8px;font-size:14px}
 @media(max-width:480px){.liens{gap:4px!important;padding-left:6px!important;padding-right:6px!important;justify-content:space-between}.liens .link{padding:6px 7px!important;font-size:10.5px!important;letter-spacing:.02em!important;min-height:34px}.liens .vgrp{display:none}}
+.mur .liens{display:none!important}.mur #app.club3d .hero.on3d{height:100vh!important;height:100dvh!important}
 </style>
 </head>
 <body>
@@ -500,6 +501,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
   var CLUB_PASS = '0000'; // mot de passe provisoire de l'espace club
   var CLUB_MAIL = ''; // adresse de la boîte du club (à renseigner)
   var HORS = !(window.claude && window.claude.use); // version hébergée, hors Claude
+  try { if (HORS && window.top !== window.self) document.documentElement.classList.add('mur'); } catch (e) { document.documentElement.classList.add('mur'); } // affichée dans le mur de supervision : pas de bandeau du bas
   var app = document.getElementById('app');
   var st = { ecran: 'accueil', lic: {}, ses: {}, cours: null, planche: null, vue: null, edit: false, msg: '', copie: '', suppr: null, gdisc: 'DTL', gtype: 'moy', gqui: 'tous', gmin: true, direct: {}, dper: 0, dtic: 0, sel: {}, clubOk: false, fiche: null };
   var db = null, dl = null, sync = 'attente', heroAnim = true, ecranVu = '';
