@@ -597,7 +597,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
 
   /* ---- base partagée (si disponible) ---- */
   /* ---- base en ligne du club (Firestore, version hébergée) ---- */
-  var FB = 'https://firestore.googleapis.com/v1/projects/btc-gas/databases/(default)/documents/', fbVu = 0, fbCours = false;
+  var FB = 'https://btc-gas.taildf2794.ts.net/fs/v1/projects/btc-gas/databases/(default)/documents/' /* données gardées sur la console du club (mini-PC), plus de base en ligne */, fbVu = 0, fbCours = false;
   function fbEnc(v) {
     if (typeof v === 'string') return { stringValue: v }; if (typeof v === 'boolean') return { booleanValue: v };
     if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
