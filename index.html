@@ -1857,7 +1857,7 @@ if (typeof module !== 'undefined') module.exports = { posteDe: posteDe, pts: pts
     else if (a === 'tireur') { st.tireur = b.dataset.k; st.retourT = st.ecran; st.ecran = 'tireur'; window.scrollTo(0, 0); }
     else if (a === 'dper') { st.dper = +b.dataset.k; st.dtic = 0; st.dfix = true; }
     else if (a === 'dtab') { st.dtab = b.dataset.k; }
-    else if (a === 'compte') { location.href = (location.protocol === 'http:' && !/github\.io$/.test(location.hostname) ? '' : 'http://192.168.1.55:8080') + '/compte'; return; } // solde, plateaux et paiement : sur la console du club (Wi-Fi du club)
+    else if (a === 'compte') { location.href = 'https://btc-gas.taildf2794.ts.net/compte'; return; } // solde, plateaux et paiement : sur la console du club, par son adresse internet fixe
     else if (a === 'xtout') { telecharger('btc-gas-feuilles-' + horodate() + '.csv', csvTout()); return; }
     else if (a === 'xgen') { telecharger('btc-gas-classement-' + horodate() + '.csv', csvGeneral()); return; }
     else if (a === 'xjson') { telecharger('btc-gas-sauvegarde-' + horodate() + '.json', jsonTout()); return; }
